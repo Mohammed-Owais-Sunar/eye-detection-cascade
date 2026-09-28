@@ -427,7 +427,10 @@ with tab_edge:
                 unsafe_allow_html=True,
             )
         else:
-            # Refresh only the dashboard telemetry; the WebRTC stream remains active.\n            st_autorefresh(interval=1000, key="adpulse_stats_refresh")\n\n            rtc_configuration = RTCConfiguration({
+            # Refresh only the dashboard telemetry; the WebRTC stream remains active.
+            st_autorefresh(interval=1000, key="adpulse_stats_refresh")
+
+            rtc_configuration = RTCConfiguration({
                 "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
             })
             ctx = webrtc_streamer(
