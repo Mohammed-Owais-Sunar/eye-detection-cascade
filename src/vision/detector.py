@@ -28,7 +28,7 @@ class DetectionResult:
 
 
 class EyeDetector:
-    """Multi-person Face/Eye detector with temporary per-session tracking."""
+    """Multi-person Face/Eye detector with session-level re-identification."""
 
     def __init__(self, config: VisionConfig | None = None):
         self.config = config or VisionConfig()
@@ -42,8 +42,47 @@ class EyeDetector:
 
         self.next_track_id = 1
         self.tracks: dict[int, dict] = {}
+        # Retains lightweight face signatures only for the current session.
+        # No images are stored.
+        self.identity_memory: dict[int, dict] = {}
 
-    def _match_track(self, center: tuple[int, int], now: float, used: set[int]) -> int:
+    @staticmethod
+    def _face_signature(face_gray: np.ndarray) -> np.ndarray:
+        """Create a small lighting-normalized signature; no face image is retained."""
+        if face_gray.size == 0:
+            return np.zeros((32, 32), dtype=np.float32)
+        normalized = cv2.resize(face_gray, (32, 32), interpolation=cv2.INTER_AREA)
+        normalized = cv2.equalizeHist(normalized)
+        signature = normalized.astype(np.float32) / 255.0
+        return signature
+
+    def _signature_distance(self, first: np.ndarray, second: np.ndarray) -> float:
+        return float(np.mean(np.abs(first - second)))
+
+    def _new_track(self, center: tuple[int, int], now: float, signature: np.ndarray) -> int:
+        track_id = self.next_track_id
+        self.next_track_id += 1
+        self.tracks[track_id] = {
+            "center": center,
+            "last_seen": now,
+            "looking_started": None,
+            "dwell_time": 0.0,
+            "engaged": False,
+        }
+        self.identity_memory[track_id] = {
+            "signature": signature.copy(),
+            "last_seen": now,
+        }
+        return track_id
+
+    def _match_track(
+        self,
+        center: tuple[int, int],
+        signature: np.ndarray,
+        now: float,
+        used: set[int],
+    ) -> int:
+        # First prefer normal spatial tracking.
         best_id = None
         best_distance = float("inf")
         for track_id, track in self.tracks.items():
@@ -55,17 +94,33 @@ class EyeDetector:
                 best_distance = distance
                 best_id = track_id
 
-        if best_id is None:
-            best_id = self.next_track_id
-            self.next_track_id += 1
-            self.tracks[best_id] = {
-                "center": center,
-                "last_seen": now,
-                "looking_started": None,
-                "dwell_time": 0.0,
-                "engaged": False,
-            }
-        return best_id
+        if best_id is not None:
+            return best_id
+
+        # If spatial tracking lost the person, try the session identity memory.
+        best_id = None
+        best_similarity = float("inf")
+        for track_id, memory in self.identity_memory.items():
+            if track_id in used or now - memory["last_seen"] > self.config.reid_timeout:
+                continue
+            distance = self._signature_distance(signature, memory["signature"])
+            if distance < best_similarity and distance <= self.config.reid_match_threshold:
+                best_similarity = distance
+                best_id = track_id
+
+        if best_id is not None:
+            # Restore the existing track state if it temporarily disappeared.
+            if best_id not in self.tracks:
+                self.tracks[best_id] = {
+                    "center": center,
+                    "last_seen": now,
+                    "looking_started": None,
+                    "dwell_time": 0.0,
+                    "engaged": False,
+                }
+            return best_id
+
+        return self._new_track(center, now, signature)
 
     def process_frame(self, frame: np.ndarray) -> DetectionResult:
         start_time = time.perf_counter()
@@ -95,11 +150,21 @@ class EyeDetector:
             orig_fx, orig_fy = int(fx * inv_scale), int(fy * inv_scale)
             orig_fw, orig_fh = int(fw * inv_scale), int(fh * inv_scale)
             center = (orig_fx + orig_fw // 2, orig_fy + orig_fh // 2)
-            track_id = self._match_track(center, now, used_tracks)
+            face_crop_gray = gray[fy:fy + fh, fx:fx + fw]
+            face_signature = self._face_signature(face_crop_gray)
+            track_id = self._match_track(center, face_signature, now, used_tracks)
             used_tracks.add(track_id)
             track = self.tracks[track_id]
             track["center"] = center
             track["last_seen"] = now
+
+            # Update only the lightweight signature, never store the image.
+            memory = self.identity_memory.setdefault(
+                track_id,
+                {"signature": face_signature.copy(), "last_seen": now},
+            )
+            memory["signature"] = (memory["signature"] * 0.8) + (face_signature * 0.2)
+            memory["last_seen"] = now
 
             eye_roi_height = int(fh * 0.60)
             face_roi_gray = gray[fy:fy + eye_roi_height, fx:fx + fw]
@@ -170,6 +235,11 @@ class EyeDetector:
             track_id: track
             for track_id, track in self.tracks.items()
             if now - track["last_seen"] <= self.config.track_timeout
+        }
+        self.identity_memory = {
+            track_id: memory
+            for track_id, memory in self.identity_memory.items()
+            if now - memory["last_seen"] <= self.config.reid_timeout
         }
 
         latency_ms = (time.perf_counter() - start_time) * 1000.0
