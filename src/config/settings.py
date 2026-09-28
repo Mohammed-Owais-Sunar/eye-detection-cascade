@@ -27,10 +27,6 @@ class VisionConfig:
     track_max_distance: int = 100
     track_timeout: float = 1.5
 
-    # Session-level re-identification memory. This lets the same person
-    # keep their Person ID after briefly leaving and returning.
-    reid_timeout: float = 60.0
-    reid_match_threshold: float = 0.18
 
     face_box_color: tuple[int, int, int] = (255, 180, 50)
     eye_box_color: tuple[int, int, int] = (50, 220, 90)
