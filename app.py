@@ -91,6 +91,12 @@ if "seen_track_ids" not in st.session_state:
     st.session_state.seen_track_ids = set()
 if "engaged_track_ids" not in st.session_state:
     st.session_state.engaged_track_ids = set()
+if "session_started_at" not in st.session_state:
+    st.session_state.session_started_at = None
+if "total_frames" not in st.session_state:
+    st.session_state.total_frames = 0
+if "last_latency" not in st.session_state:
+    st.session_state.last_latency = 0.0
 
 logger = DetectionLogger()
 
@@ -125,6 +131,9 @@ with tab_edge:
         if not st.session_state.running:
             if st.button("▶ Activate Edge Camera", use_container_width=True):
                 st.session_state.running = True
+                st.session_state.session_started_at = time.time()
+                st.session_state.seen_track_ids = set()
+                st.session_state.engaged_track_ids = set()
                 st.rerun()
         else:
             if st.button("⏹ Stop Sensor", use_container_width=True):
@@ -135,10 +144,13 @@ with tab_edge:
         imp_ph = st.empty()
         eng_ph = st.empty()
         rate_ph = st.empty()
+        live_ph = st.empty()
+        latency_ph = st.empty()
+        session_ph = st.empty()
 
     with left:
         st.markdown("### ◉ Live vision feed")
-        st.caption("People are tracked independently · Engagement requires 5 seconds of continuous eye detection")
+        st.caption("MULTI-PERSON TRACKING  •  CONTINUOUS 5-SECOND ATTENTION  •  ONE-TIME ENGAGEMENT")
         stframe = st.empty()
         fps_ph = st.empty()
 
@@ -157,6 +169,8 @@ with tab_edge:
 
                 frame = cv2.flip(frame, 1)
                 result = detector.process_frame(frame)
+                st.session_state.total_frames += 1
+                st.session_state.last_latency = result.latency_ms
 
                 # FPS
                 now = time.time()
@@ -192,16 +206,25 @@ with tab_edge:
                     cv2.cvtColor(result.annotated_frame, cv2.COLOR_BGR2RGB),
                     use_container_width=True,
                 )
-                fps_ph.metric("FPS", f"{fps:.1f}")
 
-                imp_ph.metric("Impressions (session)", st.session_state.session_impressions)
-                eng_ph.metric("Engagements (session)", st.session_state.session_engagements)
+                looking_now = sum(1 for p in result.persons if p.looking)
+                engaged_now = sum(1 for p in result.persons if p.engaged)
                 rate = (
                     st.session_state.session_engagements
                     / max(st.session_state.session_impressions, 1)
                     * 100
                 )
-                rate_ph.metric("Engagement Rate", f"{rate:.1f}%")
+
+                fps_ph.metric("⚡ FPS", f"{fps:.1f}")
+                imp_ph.metric("👥 People", st.session_state.session_impressions)
+                eng_ph.metric("🎯 Engagements", st.session_state.session_engagements)
+                rate_ph.metric("📈 Conversion", f"{rate:.1f}%")
+                live_ph.metric("👁️ Looking now", f"{looking_now} · engaged {engaged_now}")
+                latency_ph.metric("🧠 Vision latency", f"{result.latency_ms:.1f} ms")
+
+                if st.session_state.session_started_at:
+                    elapsed = int(time.time() - st.session_state.session_started_at)
+                    session_ph.metric("⏱️ Session", f"{elapsed // 60:02d}:{elapsed % 60:02d}")
         finally:
             cap.release()
 
@@ -232,6 +255,9 @@ with tab_cloud:
                 st.session_state.seen_track_ids = set()
                 st.session_state.engaged_track_ids = set()
                 st.session_state.last_face_seen = 0.0
+                st.session_state.session_started_at = None
+                st.session_state.total_frames = 0
+                st.session_state.last_latency = 0.0
                 st.success("All local analytics cleared and session counters reset.")
                 st.rerun()
 
@@ -254,6 +280,12 @@ with tab_cloud:
                 "Avg Dwell (s)",
                 f"{df['dwell_time'].mean():.1f}" if "dwell_time" in df else "—",
             )
+
+            st.markdown("### 🧭 Performance snapshot")
+            s1, s2, s3 = st.columns(3)
+            s1.metric("Median dwell", f"{df['dwell_time'].median():.1f}s")
+            s2.metric("Longest attention", f"{df['dwell_time'].max():.1f}s")
+            s3.metric("Tracked zones", int(df["location_tag"].nunique()))
 
             # Filters
             st.markdown("### Filters")
