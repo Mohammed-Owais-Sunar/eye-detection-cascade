@@ -26,9 +26,18 @@ class DetectionLogger:
                 row[1] for row in conn.execute("PRAGMA table_info(ad_analytics)")
             }
             if "event_id" not in columns:
-                conn.execute("ALTER TABLE ad_analytics ADD COLUMN event_id INTEGER")
+                try:
+                    conn.execute("ALTER TABLE ad_analytics ADD COLUMN event_id INTEGER")
+                except sqlite3.OperationalError as exc:
+                    if "duplicate column name" not in str(exc).lower():
+                        raise
+
             if "event_name" not in columns:
-                conn.execute("ALTER TABLE ad_analytics ADD COLUMN event_name TEXT")
+                try:
+                    conn.execute("ALTER TABLE ad_analytics ADD COLUMN event_name TEXT")
+                except sqlite3.OperationalError as exc:
+                    if "duplicate column name" not in str(exc).lower():
+                        raise
 
             conn.execute("""CREATE TABLE IF NOT EXISTS ad_locations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
