@@ -352,7 +352,7 @@ st.markdown("""
 </div>
 """,unsafe_allow_html=True)
 
-tab_edge,tab_cloud=st.tabs(["◉  LIVE CONTROL ROOM","⌁  INTELLIGENCE LOG"])
+tab_edge,tab_cloud,tab_manager=st.tabs(["◉  LIVE CONTROL ROOM","⌁  INTELLIGENCE LOG","⚙  EVENT MANAGER"])
 
 # =========================================================
 # LIVE CONTROL ROOM
@@ -362,12 +362,34 @@ with tab_edge:
 
     with mid:
         st.markdown('<div class="hud"><div class="hud-title">deployment vector</div>',unsafe_allow_html=True)
-        location=st.selectbox("ZONE",["Library Entrance","O Building","Canteen","Hostel Gate","Sports Complex"],label_visibility="collapsed")
-        st.caption("AD CAMPAIGN")
-        campaign=st.selectbox("AD CAMPAIGN",["New Product Launch","Limited-Time Offer","Festival Campaign","Brand Awareness"],label_visibility="collapsed")
+        active_events=logger.list_events(active_only=True)
+        if active_events:
+            event_labels={event[0]: f"{event[1]}  //  {event[2]} → {event[3]}" for event in active_events}
+            selected_event_id=st.selectbox("EVENT",list(event_labels.keys()),format_func=lambda event_id: event_labels[event_id])
+            selected_event=next(event for event in active_events if event[0] == selected_event_id)
+            event_id=selected_event[0]
+            event_name=selected_event[1]
+            campaign=selected_event[4]
+            event_locations=logger.get_event_locations(event_id)
+            location_labels={loc[0]: f"{loc[1]}  //  {loc[2]}" if loc[2] else loc[1] for loc in event_locations}
+            if location_labels:
+                selected_location_id=st.selectbox("ZONE",list(location_labels.keys()),format_func=lambda location_id: location_labels[location_id])
+                selected_location=next(loc for loc in event_locations if loc[0] == selected_location_id)
+                location=selected_location[1]
+            else:
+                location=None
+                st.warning("NO LOCATIONS ASSIGNED TO THIS EVENT. ADD ONE IN EVENT MANAGER.")
+        else:
+            event_id=None
+            event_name=None
+            campaign=None
+            location=None
+            st.warning("NO ACTIVE EVENTS. CREATE AN EVENT IN EVENT MANAGER BEFORE STARTING.")
+        if active_events and location:
+            st.markdown(f'<div class="notice">EVENT // {event_name}<br>CAMPAIGN // {campaign}<br>ZONE // {location}</div>',unsafe_allow_html=True)
         st.markdown('<div class="sectionline">engine</div>',unsafe_allow_html=True)
         if not st.session_state.running:
-            if st.button("▶  INITIALIZE ENGINE",use_container_width=True):
+            if st.button("▶  INITIALIZE ENGINE",use_container_width=True,disabled=not bool(active_events and location)):
                 st.session_state.running=True
                 st.session_state.session_started_at=time.time()
                 st.session_state.seen_track_ids=set()
@@ -438,6 +460,8 @@ with tab_edge:
                 mode=WebRtcMode.SENDRECV,
                 rtc_configuration=rtc_configuration,
                 video_processor_factory=lambda: AdPulseVideoProcessor(
+                    event_id=event_id,
+                    event_name=event_name,
                     location=location,
                     campaign=campaign,
                     db_path=logger.db_path,
@@ -641,5 +665,84 @@ with tab_cloud:
             st.download_button("EXPORT TELEMETRY / CSV",df.to_csv(index=False),"adpulse_telemetry.csv","text/csv")
     except Exception as e:
         st.error(f"Telemetry archive error: {e}")
+
+
+# =========================================================
+# EVENT MANAGER
+# =========================================================
+with tab_manager:
+    st.markdown('<div class="sectionline">campaign operations / event registry</div>',unsafe_allow_html=True)
+    st.markdown('<div class="notice">CREATE REAL AD CAMPAIGNS, ASSIGN MULTIPLE PHYSICAL ZONES, AND THEN LAUNCH THE LIVE CONTROL ROOM FROM A SELECTED EVENT.</div>',unsafe_allow_html=True)
+
+    create_col, list_col = st.columns([1.05, 1.4], gap="large")
+
+    with create_col:
+        st.markdown('<div class="hud"><div class="hud-title">create event</div>',unsafe_allow_html=True)
+        event_name_input=st.text_input("EVENT NAME",placeholder="e.g. Tech Fest 2026")
+        date_a,date_b=st.columns(2)
+        with date_a:
+            start_date=st.date_input("START DATE")
+        with date_b:
+            end_date=st.date_input("END DATE")
+        campaign_input=st.selectbox("AD CAMPAIGN",["New Product Launch","Limited-Time Offer","Festival Campaign","Brand Awareness"])
+        locations=logger.list_locations(active_only=True)
+        location_map={loc[0]: loc[1] for loc in locations}
+        selected_location_ids=st.multiselect(
+            "ASSIGNED LOCATIONS",
+            list(location_map.keys()),
+            format_func=lambda location_id: next((f"{loc[1]}  //  {loc[2]}" if loc[2] else loc[1]) for loc in locations if loc[0] == location_id),
+        )
+        if st.button("＋  CREATE EVENT",use_container_width=True):
+            try:
+                new_id=logger.create_event(event_name_input,start_date.isoformat(),end_date.isoformat(),campaign_input,selected_location_ids)
+                st.success(f"EVENT CREATED // AP-EVENT-{new_id:03d}")
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
+        st.markdown('</div>',unsafe_allow_html=True)
+
+        st.markdown('<div class="hud" style="margin-top:12px"><div class="hud-title">location registry</div>',unsafe_allow_html=True)
+        location_name_input=st.text_input("LOCATION NAME",placeholder="e.g. Auditorium Gate")
+        building_input=st.text_input("BUILDING / AREA",placeholder="e.g. Main Block")
+        if st.button("＋  ADD LOCATION",use_container_width=True):
+            try:
+                logger.create_location(location_name_input,building_input)
+                st.success("LOCATION ADDED")
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
+        st.markdown('</div>',unsafe_allow_html=True)
+
+    with list_col:
+        st.markdown('<div class="hud"><div class="hud-title">event registry</div>',unsafe_allow_html=True)
+        registry=logger.list_events(active_only=False)
+        if registry:
+            registry_df=pd.DataFrame(registry,columns=["ID","EVENT","START","END","CAMPAIGN","ACTIVE","LOCATIONS"])
+            registry_df["ID"]=registry_df["ID"].map(lambda x:f"EV-{x:03d}")
+            registry_df["ACTIVE"]=registry_df["ACTIVE"].map(lambda x:"ONLINE" if x else "OFFLINE")
+            st.dataframe(registry_df,use_container_width=True,hide_index=True)
+            st.markdown('<div class="sectionline">event controls</div>',unsafe_allow_html=True)
+            control_events={row[0]:f"{row[1]}  //  {row[2]} → {row[3]}" for row in registry}
+            control_id=st.selectbox("SELECT EVENT",list(control_events.keys()),format_func=lambda x:control_events[x],key="event_control_id")
+            control_row=next(row for row in registry if row[0]==control_id)
+            current_active=bool(control_row[5])
+            if st.button("■  DEACTIVATE EVENT" if current_active else "▶  ACTIVATE EVENT",use_container_width=True):
+                logger.toggle_event(control_id,not current_active)
+                st.rerun()
+        else:
+            st.markdown('<div class="hud-empty">EVENT REGISTRY EMPTY</div>',unsafe_allow_html=True)
+        st.markdown('</div>',unsafe_allow_html=True)
+
+        st.markdown('<div class="hud" style="margin-top:12px"><div class="hud-title">location registry</div>',unsafe_allow_html=True)
+        location_registry=logger.list_locations(active_only=False)
+        if location_registry:
+            loc_df=pd.DataFrame(location_registry,columns=["ID","LOCATION","BUILDING","ACTIVE"])
+            loc_df["ID"]=loc_df["ID"].map(lambda x:f"LOC-{x:03d}")
+            loc_df["ACTIVE"]=loc_df["ACTIVE"].map(lambda x:"ONLINE" if x else "OFFLINE")
+            st.dataframe(loc_df,use_container_width=True,hide_index=True)
+        st.markdown('</div>',unsafe_allow_html=True)
+
+    st.markdown('<div class="sectionline">how it flows</div>',unsafe_allow_html=True)
+    st.markdown('<div class="notice">EVENT MANAGER → CREATE EVENT → ASSIGN LOCATIONS → LIVE CONTROL ROOM → SELECT EVENT + ZONE → INITIALIZE CAMERA → ENGAGEMENTS ARE LOGGED WITH EVENT CONTEXT.</div>',unsafe_allow_html=True)
 
 st.markdown('<div class="footerline"><span>ADPULSE / PRIVACY-FIRST AD ATTENTION</span><span>NO CAMERA FRAMES STORED / TRANSIENT PROCESSING ONLY</span><span>5 SEC ATTENTION PROTOCOL</span></div>',unsafe_allow_html=True)
