@@ -384,7 +384,6 @@ with tab_cloud:
                 st.session_state.last_face_seen=0.0
                 st.session_state.total_frames=0
                 st.session_state.last_latency=0.0
-                st.session_state.confirm_clear=False
                 st.success("TELEMETRY PURGED — LOCAL ARCHIVE IS NOW EMPTY.")
                 time.sleep(0.6)
                 st.rerun()
