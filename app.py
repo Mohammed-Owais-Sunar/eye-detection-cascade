@@ -507,7 +507,7 @@ with tab_edge:
                     "media_stream_constraints": {"video": True, "audio": False},
                     "async_processing": True,
                     "video_html_attrs": {
-                        "style": {"width": "100%", "height": "430px", "objectFit": "contain", "transform": "scaleX(-1)"},
+                        "style": {"width": "100%", "height": "430px", "objectFit": "contain"},
                         "controls": False,
                         "autoPlay": True,
                         "muted": True,
