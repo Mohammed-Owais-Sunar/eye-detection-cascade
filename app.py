@@ -187,6 +187,31 @@ input{font-family:'IBM Plex Mono'!important}
   display:flex;justify-content:space-between;color:#4e5a53;font:9px 'IBM Plex Mono';
   letter-spacing:.12em;text-transform:uppercase;
 }
+.security-strip{
+  display:grid;grid-template-columns:2fr 1fr 1.25fr 1.1fr;
+  gap:0;border:1px solid #27312b;background:#070a08;
+  margin:4px 0 12px;min-height:78px;
+}
+.security-strip>div{padding:14px 16px;border-right:1px solid #202922}
+.security-strip>div:last-child{border-right:0}
+.security-kicker,.security-stat span{
+  display:block;color:#657269;font:9px 'IBM Plex Mono';
+  letter-spacing:.14em;text-transform:uppercase;
+}
+.security-main{margin-top:7px;color:var(--acid);font:600 20px 'IBM Plex Mono';letter-spacing:.02em}
+.security-stat{display:flex;flex-direction:column;justify-content:center;gap:7px}
+.security-stat b{color:#dfe9e2;font:500 13px 'IBM Plex Mono';letter-spacing:.04em}
+.danger-panel{
+  border:1px solid #4a2929;background:#120909;padding:15px 17px;
+  margin-bottom:14px;
+}
+.danger-title{color:#ff7777;font:600 11px 'IBM Plex Mono';letter-spacing:.14em}
+.danger-copy{color:#9c8b8b;font:11px 'IBM Plex Mono';line-height:1.7;margin-top:9px}
+.danger-copy b{color:#e2cccc}
+@media(max-width:900px){
+  .security-strip{grid-template-columns:1fr 1fr}
+  .security-strip>div:nth-child(2){border-right:0}
+}
 @media(max-width:900px){.block-container{padding:12px}.brand{grid-template-columns:1fr}.brand-mark{display:none}}
 </style>
 """, unsafe_allow_html=True)
@@ -354,28 +379,65 @@ with tab_cloud:
     st.markdown('<div class="sectionline">telemetry archive / intelligence log</div>',unsafe_allow_html=True)
 
     # ---------------------------------------------------------
-    # LOCAL DATA WIPE
+    # PRIVACY / DATA SECURITY CONSOLE
     # ---------------------------------------------------------
     with sqlite3.connect(logger.db_path) as conn:
         archive_count = conn.execute("SELECT COUNT(*) FROM ad_analytics").fetchone()[0]
 
+    archive_label = "ARCHIVE EMPTY" if archive_count == 0 else f"{archive_count:,} TELEMETRY EVENTS"
+    archive_state = "● CLEAR" if archive_count == 0 else "● ACTIVE"
+
     st.markdown(
-        f'<div class="hud"><div class="hud-title">local archive / data control</div>'
-        f'<div class="notice">ARCHIVE STATUS: <b>{archive_count:,} EVENTS</b><br>'
-        'CAMERA FRAMES ARE NEVER STORED. ONLY LOCAL TELEMETRY EVENTS ARE RETAINED.</div></div>',
+        f'''
+        <div class="security-strip">
+          <div>
+            <div class="security-kicker">LOCAL DATA VAULT</div>
+            <div class="security-main">{archive_state}</div>
+          </div>
+          <div class="security-stat">
+            <span>STORED EVENTS</span><b>{archive_count:,}</b>
+          </div>
+          <div class="security-stat">
+            <span>CAMERA FRAMES</span><b>NOT STORED</b>
+          </div>
+          <div class="security-stat">
+            <span>DATA LOCATION</span><b>LOCAL ONLY</b>
+          </div>
+        </div>
+        ''',
         unsafe_allow_html=True,
     )
 
-    with st.expander("⌫  OPEN DATA DESTRUCTION CONSOLE"):
-        st.warning("PERMANENT ACTION — this deletes every stored engagement event from analytics.db and clears the current session counters.")
-        confirm=st.checkbox("I UNDERSTAND — CONFIRM PERMANENT DELETION",key="confirm_clear")
-        if st.button("☒  DELETE ALL TELEMETRY",disabled=not confirm,use_container_width=True):
+    with st.expander("⌫  DANGER ZONE / PERMANENT DATA WIPE"):
+        st.markdown(
+            '<div class="danger-panel">'
+            '<div class="danger-title">⚠ PERMANENT DELETION PROTOCOL</div>'
+            '<div class="danger-copy">'
+            'This operation permanently removes every stored engagement event from '
+            '<b>analytics.db</b> and resets the current session telemetry. '
+            'Camera frames are not stored.'
+            '</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        confirm=st.checkbox(
+            "I UNDERSTAND — DELETE THE COMPLETE LOCAL TELEMETRY ARCHIVE",
+            key="confirm_clear",
+        )
+
+        if st.button(
+            "☒  PURGE ALL TELEMETRY",
+            disabled=not confirm,
+            use_container_width=True,
+        ):
             if st.session_state.running:
-                st.error("TERMINATE THE LIVE ENGINE BEFORE DELETING TELEMETRY.")
+                st.error("TERMINATE THE LIVE ENGINE BEFORE PURGING TELEMETRY.")
             else:
                 with sqlite3.connect(logger.db_path) as conn:
                     conn.execute("DELETE FROM ad_analytics")
                     conn.commit()
+
                 st.session_state.session_impressions=0
                 st.session_state.session_engagements=0
                 st.session_state.seen_track_ids=set()
@@ -384,7 +446,8 @@ with tab_cloud:
                 st.session_state.last_face_seen=0.0
                 st.session_state.total_frames=0
                 st.session_state.last_latency=0.0
-                st.success("TELEMETRY PURGED — LOCAL ARCHIVE IS NOW EMPTY.")
+
+                st.success("✓ TELEMETRY PURGED — LOCAL DATA VAULT IS CLEAR.")
                 time.sleep(0.6)
                 st.rerun()
 
