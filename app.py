@@ -577,48 +577,18 @@ with tab_cloud:
             st.markdown('<div class="sectionline">performance vectors</div>',unsafe_allow_html=True)
             loc=df.groupby("location_tag")["engaged"].mean().mul(100).sort_values(ascending=False)
             camp=df.groupby("campaign")["engaged"].mean().mul(100).sort_values(ascending=False)
-
-            def hud_bar_chart(series, title):
-                if series.empty:
-                    return f'<div class="metric-chart"><div class="metric-chart-title">{title}</div><div class="hud-empty">NO TELEMETRY AVAILABLE</div></div>'
-                max_value=max(float(series.max()),1.0)
-                rows=[]
-                for label,value in series.items():
-                    width=max(0,min(float(value)/max_value*100,100))
-                    rows.append(
-                        f'<div class="hud-bar-row">'
-                        f'<div class="hud-bar-label">{label}</div>'
-                        f'<div class="hud-bar-track"><div class="hud-bar-fill" style="width:{width:.1f}%"></div></div>'
-                        f'<div class="hud-bar-value">{float(value):.1f}%</div>'
-                        f'</div>'
-                    )
-                return f'<div class="metric-chart"><div class="metric-chart-title">{title}</div><div class="hud-bars">{"".join(rows)}</div></div>'
-
             x,y=st.columns(2)
             with x:
-                st.markdown(hud_bar_chart(loc,"LOCATION / ENGAGEMENT %"),unsafe_allow_html=True)
+                st.caption("LOCATION / ENGAGEMENT %")
+                st.bar_chart(loc,use_container_width=True)
             with y:
-                st.markdown(hud_bar_chart(camp,"CAMPAIGN / ENGAGEMENT %"),unsafe_allow_html=True)
+                st.caption("CAMPAIGN / ENGAGEMENT %")
+                st.bar_chart(camp,use_container_width=True)
 
             st.markdown('<div class="sectionline">attention timeline</div>',unsafe_allow_html=True)
             timeline=df.set_index("timestamp")["engaged"].resample("1min").agg(["count","sum"])
             timeline.columns=["events","engagements"]
-
-            if timeline.empty:
-                st.markdown('<div class="metric-chart"><div class="hud-empty">NO TIMELINE DATA</div></div>',unsafe_allow_html=True)
-            else:
-                peak=max(int(timeline["events"].max()),1)
-                bars=[]
-                for _,row in timeline.tail(60).iterrows():
-                    height=max(4,min(float(row["events"])/peak*100,100))
-                    bars.append(f'<div class="hud-time-bar" style="height:{height:.1f}%" title="Events: {int(row["events"])} | Engagements: {int(row["engagements"])}"></div>')
-                st.markdown(
-                    '<div class="metric-chart">'
-                    '<div class="metric-chart-title">EVENT DENSITY / 1 MINUTE</div>'
-                    f'<div class="hud-timeline">{"".join(bars)}</div>'
-                    '</div>',
-                    unsafe_allow_html=True,
-                )
+            st.area_chart(timeline,use_container_width=True)
 
             st.markdown('<div class="sectionline">raw event stream</div>',unsafe_allow_html=True)
 
