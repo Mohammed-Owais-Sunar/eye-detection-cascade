@@ -182,6 +182,58 @@ input{font-family:'IBM Plex Mono'!important}
   border:1px dashed #39453d;padding:13px 15px;color:#8d9b92;
   font:11px 'IBM Plex Mono';line-height:1.7;background:#080b09;
 }
+.event-grid{
+  border:1px solid #27312b;
+  background:#060908;
+  overflow:hidden;
+}
+.event-grid-scroll{
+  max-height:390px;
+  overflow:auto;
+  scrollbar-width:thin;
+  scrollbar-color:#344239 #080b09;
+}
+.event-grid table{
+  width:100%;
+  min-width:900px;
+  border-collapse:collapse;
+  table-layout:fixed;
+  font:10px 'IBM Plex Mono';
+  color:#cbd6ce;
+}
+.event-grid th{
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:#0c120e;
+  color:#8fa097;
+  border-bottom:1px solid #344139;
+  padding:10px 12px;
+  text-align:left;
+  letter-spacing:.10em;
+  font-weight:500;
+  white-space:nowrap;
+}
+.event-grid td{
+  padding:9px 12px;
+  border-bottom:1px solid #18211b;
+  text-align:left;
+  vertical-align:middle;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.event-grid tr:hover td{
+  background:#0d140f;
+  color:#eff7f1;
+}
+.event-grid th:nth-child(1),.event-grid td:nth-child(1){width:105px;color:var(--acid)}
+.event-grid th:nth-child(2),.event-grid td:nth-child(2){width:185px}
+.event-grid th:nth-child(3),.event-grid td:nth-child(3){width:145px}
+.event-grid th:nth-child(4),.event-grid td:nth-child(4){width:205px}
+.event-grid th:nth-child(5),.event-grid td:nth-child(5){width:90px;text-align:right}
+.event-grid th:nth-child(6),.event-grid td:nth-child(6),
+.event-grid th:nth-child(7),.event-grid td:nth-child(7){width:90px;text-align:center}
 .footerline{
   margin-top:35px;padding-top:12px;border-top:1px solid #202922;
   display:flex;justify-content:space-between;color:#4e5a53;font:9px 'IBM Plex Mono';
@@ -211,6 +263,21 @@ input{font-family:'IBM Plex Mono'!important}
 @media(max-width:900px){
   .security-strip{grid-template-columns:1fr 1fr}
   .security-strip>div:nth-child(2){border-right:0}
+}
+/* FINAL HUD POLISH */
+[data-testid="stExpander"] summary{
+  background:#0a0f0c!important;
+  color:#dce8df!important;
+}
+[data-testid="stExpander"] summary:hover{
+  background:#101711!important;
+  color:var(--acid)!important;
+}
+[data-testid="stCheckbox"] label{
+  color:#cfd9d2!important;
+}
+[data-testid="stCheckbox"] [data-baseweb="checkbox"]{
+  border-color:#4c5b50!important;
 }
 @media(max-width:900px){.block-container{padding:12px}.brand{grid-template-columns:1fr}.brand-mark{display:none}}
 </style>
@@ -490,7 +557,35 @@ with tab_cloud:
             st.area_chart(timeline)
 
             st.markdown('<div class="sectionline">raw event stream</div>',unsafe_allow_html=True)
-            st.dataframe(df.tail(100),use_container_width=True)
+
+            # Keep database IDs private from the presentation layer.
+            # Generate stable, readable event IDs for the visible report.
+            events=df.tail(100).copy().reset_index(drop=True)
+            events.insert(0,"event_id",[f"VG-E{i:03d}" for i in range(1,len(events)+1)])
+
+            display_cols=[
+                "event_id","timestamp","location_tag","campaign",
+                "dwell_time","engaged","smiled"
+            ]
+            events=events[display_cols].rename(columns={
+                "event_id":"EVENT",
+                "timestamp":"TIMESTAMP",
+                "location_tag":"LOCATION",
+                "campaign":"CAMPAIGN",
+                "dwell_time":"DWELL",
+                "engaged":"ENGAGED",
+                "smiled":"SMILED",
+            })
+            events["TIMESTAMP"]=events["TIMESTAMP"].dt.strftime("%d %b %Y  %H:%M:%S")
+            events["DWELL"]=events["DWELL"].map(lambda x:f"{x:.1f}s")
+            events["ENGAGED"]=events["ENGAGED"].map(lambda x:"YES" if bool(x) else "NO")
+            events["SMILED"]=events["SMILED"].map(lambda x:"YES" if bool(x) else "NO")
+
+            table_html=events.to_html(index=False,escape=True,border=0)
+            st.markdown(
+                f'<div class="event-grid"><div class="event-grid-scroll">{table_html}</div></div>',
+                unsafe_allow_html=True,
+            )
             st.download_button("EXPORT TELEMETRY / CSV",df.to_csv(index=False),"visionguard_telemetry.csv","text/csv")
     except Exception as e:
         st.error(f"Telemetry archive error: {e}")
