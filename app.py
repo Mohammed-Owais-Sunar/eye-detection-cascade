@@ -470,7 +470,6 @@ with tab_edge:
     with left:
         st.markdown('<div class="hud"><div class="hud-title">camera / attention field</div>',unsafe_allow_html=True)
         stframe=st.empty()
-        fps_ph_left=st.empty()
 
         if st.session_state.running:
             consent = st.checkbox(
@@ -531,11 +530,21 @@ with tab_edge:
                 processor = ctx.video_processor
                 if processor is not None:
                     st.session_state.adpulse_processor = processor
-                    fps_ph_left.metric("FRAME RATE", f'{processor.snapshot()["fps"]:.1f} FPS')
-                else:
-                    fps_ph_left.metric("FRAME RATE", "0.0 FPS")
+
+                fps_run_every = 0.5
+
+                @st.fragment(run_every=fps_run_every)
+                def live_fps():
+                    active_processor = st.session_state.get("adpulse_processor")
+                    if st.session_state.running and active_processor is not None:
+                        fps = active_processor.snapshot()["fps"]
+                        st.metric("FRAME RATE", f"{fps:.1f} FPS")
+                    else:
+                        st.metric("FRAME RATE", "0.0 FPS")
+
+                live_fps()
         else:
-            fps_ph_left.metric("FRAME RATE","—")
+            st.metric("FRAME RATE","—")
 
         st.markdown('</div>',unsafe_allow_html=True)
 
