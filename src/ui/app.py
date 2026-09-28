@@ -1,12 +1,20 @@
+import sys
+from pathlib import Path
 import time
 import cv2
 import streamlit as st
 import pandas as pd
 
+# Add the project root to Python's path so Streamlit Cloud can find the 'src' folder
+root_path = Path(__file__).resolve().parent.parent.parent
+sys.path.append(str(root_path))
+
 from src.data_layer.logger import DetectionLogger
 from src.vision.detector import EyeDetector
 
 st.set_page_config(page_title="Campus Ad Analytics", page_icon="📊", layout="wide")
+
+# ... (Keep the rest of your app.py code exactly the same below this line) ...
 
 @st.cache_resource
 def get_detector() -> EyeDetector:
