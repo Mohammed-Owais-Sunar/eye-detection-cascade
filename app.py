@@ -1,5 +1,4 @@
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh
 import cv2
 import pandas as pd
 import sqlite3
@@ -449,12 +448,12 @@ with tab_edge:
                 unsafe_allow_html=True,
             )
         else:
-            # Refresh only the dashboard telemetry; the WebRTC stream remains active.
-            st_autorefresh(interval=1000, key="adpulse_stats_refresh")
-
-            rtc_configuration = RTCConfiguration({
+            # Keep the cloud WebRTC connection simple and stable.
+            # TURN credentials can be added later through Streamlit secrets if a
+            # restrictive network prevents a direct ICE connection.
+            rtc_configuration = {
                 "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-            })
+            }
             ctx = webrtc_streamer(
                 key="adpulse-camera",
                 mode=WebRtcMode.SENDRECV,
