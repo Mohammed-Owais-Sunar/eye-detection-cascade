@@ -19,6 +19,9 @@ class VisionConfig:
     eye_min_neighbors: int = 4
     eye_min_size: tuple[int, int] = (15, 15)
 
+    # "Engaged" = both eyes detected, not just one
+    min_eyes_for_engagement: int = 2
+
     face_box_color: tuple[int, int, int] = (255, 180, 50)
     eye_box_color: tuple[int, int, int] = (50, 220, 90)
     box_thickness: int = 2

@@ -12,6 +12,7 @@ class DetectionResult:
     annotated_frame: np.ndarray
     face_count: int
     eye_count: int
+    engaged: bool
     latency_ms: float
 
 
@@ -101,5 +102,6 @@ class EyeDetector:
             annotated_frame=annotated,
             face_count=len(faces),
             eye_count=total_eyes,
+            engaged=total_eyes >= self.config.min_eyes_for_engagement,
             latency_ms=round(latency_ms, 2),
         )

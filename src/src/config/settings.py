@@ -9,6 +9,7 @@ MODELS_DIR = BASE_DIR / "models"
 class VisionConfig:
     face_cascade_path: Path = MODELS_DIR / "haarcascade_frontalface_default.xml"
     eye_cascade_path: Path = MODELS_DIR / "haarcascade_eye_tree_eyeglasses.xml"
+    min_eyes_for_engagement: int = 2
 
     # Inference downscaling for target 24-30 FPS
     scale_factor: float = 0.5
