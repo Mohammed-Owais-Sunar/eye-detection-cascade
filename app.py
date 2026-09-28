@@ -222,7 +222,8 @@ input{font-family:'IBM Plex Mono'!important}
 defaults={
     "running":False,"session_impressions":0,"session_engagements":0,
     "last_face_seen":0.0,"seen_track_ids":set(),"engaged_track_ids":set(),
-    "session_started_at":None,"total_frames":0,"last_latency":0.0
+    "session_started_at":None,"total_frames":0,"last_latency":0.0,
+    "peak_people":0,"peak_looking":0
 }
 for key,value in defaults.items():
     if key not in st.session_state:
@@ -258,8 +259,8 @@ with tab_edge:
 
     with mid:
         st.markdown('<div class="hud"><div class="hud-title">deployment vector</div>',unsafe_allow_html=True)
-        location=st.selectbox("ZONE",["Library Entrance","Tech Block","Canteen","Hostel Gate","Sports Complex"],label_visibility="collapsed")
-        campaign=st.selectbox("CAMPAIGN",["Tech Symposium Ad","Hackathon Poster","Campus Election","Club Recruitment"],label_visibility="collapsed")
+        location=st.selectbox("ZONE",["Library Entrance","O Building","Canteen","Hostel Gate","Sports Complex"],label_visibility="collapsed")
+        campaign=st.selectbox("CAMPAIGN",["Mid-Sem Exam Timetable","Hackathon Poster","Campus Election","Club Recruitment"],label_visibility="collapsed")
         st.markdown('<div class="sectionline">engine</div>',unsafe_allow_html=True)
         if not st.session_state.running:
             if st.button("▶  INITIALIZE ENGINE",use_container_width=True):
@@ -267,6 +268,8 @@ with tab_edge:
                 st.session_state.session_started_at=time.time()
                 st.session_state.seen_track_ids=set()
                 st.session_state.engaged_track_ids=set()
+                st.session_state.peak_people=0
+                st.session_state.peak_looking=0
                 st.rerun()
         else:
             if st.button("■  TERMINATE FEED",use_container_width=True):
@@ -279,6 +282,8 @@ with tab_edge:
                 st.session_state.seen_track_ids=set()
                 st.session_state.engaged_track_ids=set()
                 st.session_state.session_started_at=None
+                st.session_state.peak_people=0
+                st.session_state.peak_looking=0
                 st.rerun()
             else:
                 st.warning("Terminate the feed before resetting.")
@@ -291,7 +296,7 @@ with tab_edge:
         status="ONLINE" if st.session_state.running else "STANDBY"
         status_cls="status-online" if st.session_state.running else "status-idle"
         st.markdown(f'<div class="signal"><span>engine</span><b class="{status_cls}">{status}</b></div>',unsafe_allow_html=True)
-        imp_ph=st.empty(); eng_ph=st.empty(); rate_ph=st.empty(); live_ph=st.empty(); latency_ph=st.empty(); session_ph=st.empty()
+        imp_ph=st.empty(); eng_ph=st.empty(); rate_ph=st.empty(); live_ph=st.empty(); latency_ph=st.empty(); session_ph=st.empty(); peak_ph=st.empty()
         st.markdown('</div>',unsafe_allow_html=True)
         st.markdown('<div class="hud" style="margin-top:12px"><div class="hud-title">active tracks</div>',unsafe_allow_html=True)
         people_ph=st.empty()
@@ -338,11 +343,14 @@ with tab_edge:
 
                 looking=sum(1 for p in result.persons if p.looking)
                 engaged=sum(1 for p in result.persons if p.engaged)
+                st.session_state.peak_people=max(st.session_state.peak_people,len(result.persons))
+                st.session_state.peak_looking=max(st.session_state.peak_looking,looking)
                 rate=st.session_state.session_engagements/max(st.session_state.session_impressions,1)*100
                 imp_ph.markdown(f'<div class="micro">UNIQUE PEOPLE</div><div class="big-number">{st.session_state.session_impressions:02d}</div>',unsafe_allow_html=True)
                 eng_ph.markdown(f'<div class="micro">ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>',unsafe_allow_html=True)
                 rate_ph.markdown(f'<div class="micro">CONVERSION</div><div class="big-number">{rate:04.1f}%</div>',unsafe_allow_html=True)
                 live_ph.markdown(f'<div class="signal"><span>looking now</span><b>{looking:02d}</b></div><div class="signal"><span>engaged now</span><b>{engaged:02d}</b></div>',unsafe_allow_html=True)
+                peak_ph.markdown(f'<div class="signal"><span>peak audience</span><b>{st.session_state.peak_people:02d}</b></div><div class="signal"><span>peak looking</span><b>{st.session_state.peak_looking:02d}</b></div>',unsafe_allow_html=True)
                 latency_ph.metric("LATENCY",f"{result.latency_ms:.1f} ms")
                 fps_ph.metric("FRAME RATE",f"{fps:.1f} FPS")
                 if st.session_state.session_started_at:
@@ -368,6 +376,7 @@ with tab_edge:
         rate=st.session_state.session_engagements/max(st.session_state.session_impressions,1)*100
         rate_ph.markdown(f'<div class="micro">CONVERSION</div><div class="big-number">{rate:04.1f}%</div>',unsafe_allow_html=True)
         live_ph.markdown('<div class="micro">ENGINE STANDBY</div>',unsafe_allow_html=True)
+        peak_ph.markdown(f'<div class="signal"><span>peak audience</span><b>{st.session_state.peak_people:02d}</b></div><div class="signal"><span>peak looking</span><b>{st.session_state.peak_looking:02d}</b></div>',unsafe_allow_html=True)
         latency_ph.metric("LATENCY","—")
         session_ph.metric("SESSION","00:00")
         people_ph.markdown('<div class="micro">NO ACTIVE TRACKS</div>',unsafe_allow_html=True)
@@ -446,6 +455,8 @@ with tab_cloud:
                 st.session_state.last_face_seen=0.0
                 st.session_state.total_frames=0
                 st.session_state.last_latency=0.0
+                st.session_state.peak_people=0
+                st.session_state.peak_looking=0
 
                 st.success("✓ TELEMETRY PURGED — LOCAL DATA VAULT IS CLEAR.")
                 time.sleep(0.6)
