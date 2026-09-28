@@ -637,15 +637,16 @@ with tab_cloud:
             # Keep database IDs private from the presentation layer.
             # Generate stable, readable event IDs for the visible report.
             events=df.tail(100).copy().reset_index(drop=True)
-            events.insert(0,"event_id",[f"AP-E{i:03d}" for i in range(1,len(events)+1)])
+            events.insert(0,"display_event_id",[f"AP-E{i:03d}" for i in range(1,len(events)+1)])
 
             display_cols=[
-                "event_id","event_name","timestamp","location_tag","campaign",
+                "display_event_id","event_id","event_name","timestamp","location_tag","campaign",
                 "dwell_time","engaged","smiled"
             ]
             events=events[display_cols].rename(columns={
+                "display_event_id":"EVENT",
                 "event_id":"EVENT ID",
-                "event_name":"EVENT",
+                "event_name":"EVENT NAME",
                 "timestamp":"TIMESTAMP",
                 "location_tag":"LOCATION",
                 "campaign":"CAMPAIGN",
