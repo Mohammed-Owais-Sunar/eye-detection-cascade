@@ -353,20 +353,40 @@ with tab_edge:
 with tab_cloud:
     st.markdown('<div class="sectionline">telemetry archive / intelligence log</div>',unsafe_allow_html=True)
 
-    with st.expander("⌫  DATA DESTRUCTION / CLEAR LOCAL ARCHIVE"):
-        st.warning("This permanently deletes all locally stored engagement events.")
-        confirm=st.checkbox("CONFIRM PERMANENT DELETION",key="confirm_clear")
-        if st.button("DELETE ALL TELEMETRY",disabled=not confirm):
+    # ---------------------------------------------------------
+    # LOCAL DATA WIPE
+    # ---------------------------------------------------------
+    with sqlite3.connect(logger.db_path) as conn:
+        archive_count = conn.execute("SELECT COUNT(*) FROM ad_analytics").fetchone()[0]
+
+    st.markdown(
+        f'<div class="hud"><div class="hud-title">local archive / data control</div>'
+        f'<div class="notice">ARCHIVE STATUS: <b>{archive_count:,} EVENTS</b><br>'
+        'CAMERA FRAMES ARE NEVER STORED. ONLY LOCAL TELEMETRY EVENTS ARE RETAINED.</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("⌫  OPEN DATA DESTRUCTION CONSOLE"):
+        st.warning("PERMANENT ACTION — this deletes every stored engagement event from analytics.db and clears the current session counters.")
+        confirm=st.checkbox("I UNDERSTAND — CONFIRM PERMANENT DELETION",key="confirm_clear")
+        if st.button("☒  DELETE ALL TELEMETRY",disabled=not confirm,use_container_width=True):
             if st.session_state.running:
-                st.error("Terminate the live engine first.")
+                st.error("TERMINATE THE LIVE ENGINE BEFORE DELETING TELEMETRY.")
             else:
                 with sqlite3.connect(logger.db_path) as conn:
                     conn.execute("DELETE FROM ad_analytics")
+                    conn.commit()
                 st.session_state.session_impressions=0
                 st.session_state.session_engagements=0
                 st.session_state.seen_track_ids=set()
                 st.session_state.engaged_track_ids=set()
                 st.session_state.session_started_at=None
+                st.session_state.last_face_seen=0.0
+                st.session_state.total_frames=0
+                st.session_state.last_latency=0.0
+                st.session_state.confirm_clear=False
+                st.success("TELEMETRY PURGED — LOCAL ARCHIVE IS NOW EMPTY.")
+                time.sleep(0.6)
                 st.rerun()
 
     try:
