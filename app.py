@@ -85,6 +85,10 @@ if "session_engagements" not in st.session_state:
     st.session_state.session_engagements = 0
 if "last_face_seen" not in st.session_state:
     st.session_state.last_face_seen = 0.0
+if "seen_track_ids" not in st.session_state:
+    st.session_state.seen_track_ids = set()
+if "engaged_track_ids" not in st.session_state:
+    st.session_state.engaged_track_ids = set()
 
 logger = DetectionLogger()
 
@@ -132,7 +136,6 @@ with tab_edge:
         detector = EyeDetector()
         cap = cv2.VideoCapture(0)
         prev_time = time.time()
-        last_log_time = 0.0
 
         try:
             while st.session_state.running:
@@ -150,14 +153,28 @@ with tab_edge:
                 fps = 1.0 / max(now - prev_time, 1e-6)
                 prev_time = now
 
-                # Debounced logging: at most one row per 2 seconds while a face is present
-                if result.face_count > 0 and (now - last_log_time) > 2.0:
-                    engaged = result.engaged
-                    logger.log_interaction(location, campaign, 2.0, engaged, False)
-                    st.session_state.session_impressions += 1
-                    if engaged:
+                # Count each tracked person once as an impression.
+                for person in result.persons:
+                    if person.track_id not in st.session_state.seen_track_ids:
+                        st.session_state.seen_track_ids.add(person.track_id)
+                        st.session_state.session_impressions += 1
+
+                    # Engagement is counted only once after continuous 5-second looking.
+                    if (
+                        person.engaged
+                        and person.track_id not in st.session_state.engaged_track_ids
+                    ):
+                        st.session_state.engaged_track_ids.add(person.track_id)
                         st.session_state.session_engagements += 1
-                    last_log_time = now
+                        logger.log_interaction(
+                            location,
+                            campaign,
+                            person.dwell_time,
+                            True,
+                            False,
+                        )
+
+                if result.face_count > 0:
                     st.session_state.last_face_seen = now
 
                 # Render
