@@ -1,122 +1,81 @@
-import sys
-from pathlib import Path
-import time
-import cv2
 import streamlit as st
+import cv2
 import pandas as pd
+import sys
+import sqlite3
+from pathlib import Path
 
-# Add the project root to Python's path so Streamlit Cloud can find the 'src' folder
+# Pathing fix so Streamlit Cloud can find the src modules
 root_path = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(root_path))
 
-from src.data_layer.logger import DetectionLogger
 from src.vision.detector import EyeDetector
+from src.data_layer.logger import DetectionLogger
 
-st.set_page_config(page_title="Campus Ad Analytics", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Campus Ad Analytics", page_icon="🎯", layout="wide")
 
-# ... (Keep the rest of your app.py code exactly the same below this line) ...
+# Apply modern dark theme aesthetics
+st.markdown("""
+    
+""", unsafe_allow_html=True)
 
-@st.cache_resource
-def get_detector() -> EyeDetector:
-    return EyeDetector()
+logger = DetectionLogger()
 
-@st.cache_resource
-def get_logger() -> DetectionLogger:
-    return DetectionLogger()
+st.title("Spatial Ad Analytics Engine 🎯")
+st.write("Edge-to-cloud pipeline for real-time physical advertising conversion metrics.")
 
-def main() -> None:
-    st.title("📊 Spatial Ad Analytics Engine")
-    st.caption("A/B testing physical campus locations by converting foot traffic into visual engagement metrics.")
+tab1, tab2 = st.tabs(["🔴 Edge Sensor (Local)", "📈 Cloud Analytics (Global)"])
 
-    detector = get_detector()
-    logger = get_logger()
-
-    tab_sensor, tab_analytics = st.tabs(["📸 Live Sensor Deployment", "📈 Location Analytics"])
-
-    with tab_sensor:
-        col_controls, col_video = st.columns([1, 3])
+with tab1:
+    st.markdown("### Live Campus Location Deployment")
+    col1, col2 = st.columns(2)
+    location = col1.selectbox("Campus Zone", ["Library Entrance", "Tech Block", "Canteen"])
+    campaign = col2.selectbox("Active Campaign", ["Tech Symposium Ad", "Hackathon Poster", "Campus Election"])
+    
+    run_sensor = st.checkbox("Activate Edge Camera Sensor")
+    
+    if run_sensor:
+        stframe = st.empty()
+        detector = EyeDetector()
+        cap = cv2.VideoCapture(0)
         
-        with col_controls:
-            st.subheader("Sensor Config")
-            location_name = st.text_input("Deployment Location", value="Main Library Foyer", help="Where is this screen currently located?")
-            run_stream = st.toggle("Activate Sensor", value=False)
+        while run_sensor:
+            ret, frame = cap.read()
+            if not ret:
+                break
+                
+            processed_frame, faces, engagements = detector.process_frame(frame)
             
-            st.divider()
-            st.metric("Current Target", location_name)
-            metric_fps = st.empty()
-            metric_traffic = st.empty()
-            metric_looks = st.empty()
+            # Log data dynamically if someone enters the frame
+            if faces > 0:
+                logger.log_interaction(location, campaign, 0.5, engagements > 0)
+                
+            stframe.image(processed_frame, channels="BGR", use_column_width=True)
+            
+        cap.release()
 
-        with col_video:
-            video_placeholder = st.empty()
-            if not run_stream:
-                video_placeholder.info("Sensor inactive. Set location and toggle 'Activate Sensor'.")
-
-        if run_stream:
-            cap = cv2.VideoCapture(0)
-            last_log_time = time.time()
-            prev_frame_time = time.time()
-
-            try:
-                while run_stream:
-                    ret, frame = cap.read()
-                    if not ret:
-                        break
-
-                    frame = cv2.flip(frame, 1)
-                    result = detector.process_frame(frame)
-
-                    current_time = time.time()
-                    fps = 1.0 / max((current_time - prev_frame_time), 1e-5)
-                    prev_frame_time = current_time
-
-                    rgb_frame = cv2.cvtColor(result.annotated_frame, cv2.COLOR_BGR2RGB)
-                    video_placeholder.image(rgb_frame, channels="RGB", use_container_width=True)
-
-                    metric_fps.metric(label="System FPS", value=f"{fps:.1f}")
-                    metric_traffic.metric(label="Live Foot Traffic (Faces)", value=str(result.face_count))
-                    metric_looks.metric(label="Active Viewers (Eyes)", value=str(result.eye_count))
-
-                    # Log to database every 2 seconds
-                    if current_time - last_log_time >= 2.0 and (result.face_count > 0 or result.eye_count > 0):
-                        logger.log_event(
-                            location=location_name,
-                            face_count=result.face_count,
-                            eyes_detected=result.eye_count,
-                            latency_ms=result.latency_ms,
-                        )
-                        last_log_time = current_time
-            finally:
-                cap.release()
-
-    with tab_analytics:
-        st.subheader("Advertising Location Performance")
-        st.markdown("Compare the engagement rates of different campus deployment zones to determine the highest ROI for digital signage.")
+with tab2:
+    st.markdown("### Location A/B Testing & Engagement Metrics")
+    try:
+        conn = sqlite3.connect("analytics.db")
+        df = pd.read_sql_query("SELECT * FROM ad_analytics", conn)
         
-        df = logger.get_location_analytics()
-        
-        if df is None or df.empty:
-            st.warning("No data collected yet. Deploy the sensor to gather analytics.")
+        if not df.empty:
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
+            
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Total Impressions", len(df))
+            c2.metric("Total Engagements (Eye Contact)", df['engaged'].sum())
+            c3.metric("Avg Engagement Rate", f"{(df['engaged'].mean() * 100):.1f}%")
+            
+            st.subheader("Performance by Location")
+            # Calculate engagement conversion rate per physical zone
+            loc_stats = df.groupby('location_tag')['engaged'].mean() * 100
+            st.bar_chart(loc_stats)
+            
+            st.subheader("Raw Telemetry Logs")
+            st.dataframe(df.tail(10))
         else:
-            st.dataframe(
-                df,
-                column_config={
-                    "location": "Campus Location",
-                    "total_foot_traffic": "Total Foot Traffic (Faces)",
-                    "total_engagement": "Total Eye Contact",
-                    "engagement_rate_%": st.column_config.ProgressColumn(
-                        "Engagement Rate (%)",
-                        help="Percentage of maximum possible eye contact.",
-                        format="%f%%",
-                        min_value=0,
-                        max_value=100,
-                    ),
-                },
-                hide_index=True,
-                use_container_width=True
-            )
-            
-            st.bar_chart(data=df, x="location", y="engagement_rate_%", color="#38bdf8")
-
-if __name__ == "__main__":
-    main()
+            st.info("No sensor data logged yet. Run the Edge Sensor locally to collect initial data.")
+    except Exception as e:
+        st.warning("Database uninitialized. Start the edge sensor first.")
