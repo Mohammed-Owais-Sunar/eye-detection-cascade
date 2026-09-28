@@ -36,6 +36,10 @@ class AdPulseVideoProcessor(VideoProcessorBase):
 
     def recv(self, frame):
         image = frame.to_ndarray(format="bgr24")
+        # Front-facing webcams are commonly presented as a mirror. Flip the
+        # incoming frame before detection so the analytics view matches the
+        # real-world orientation while keeping annotations readable.
+        image = cv2.flip(image, 1)
         result = self.detector.process_frame(image)
 
         now = time.time()
