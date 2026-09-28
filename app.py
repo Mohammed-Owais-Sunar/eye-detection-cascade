@@ -182,6 +182,33 @@ input{font-family:'IBM Plex Mono'!important}
   border:1px dashed #39453d;padding:13px 15px;color:#8d9b92;
   font:11px 'IBM Plex Mono';line-height:1.7;background:#080b09;
 }
+.metric-chart{
+  border:1px solid #27312b;background:#060908;padding:14px 16px;
+  margin-top:4px;overflow:hidden;
+}
+.metric-chart-title{
+  color:#738078;font:10px 'IBM Plex Mono';letter-spacing:.12em;
+  text-transform:uppercase;margin-bottom:14px;
+}
+.hud-bars{display:flex;flex-direction:column;gap:9px}
+.hud-bar-row{
+  display:grid;grid-template-columns:145px 1fr 58px;gap:10px;
+  align-items:center;font:10px 'IBM Plex Mono';color:#b8c5bc;
+}
+.hud-bar-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud-bar-track{height:8px;background:#101611;border:1px solid #202a23;position:relative}
+.hud-bar-fill{height:100%;background:linear-gradient(90deg,#5d8f24,#b7ff38)}
+.hud-bar-value{text-align:right;color:#b7ff38}
+.hud-timeline{
+  display:flex;align-items:flex-end;gap:3px;height:145px;
+  padding:12px 6px 4px;border-top:1px solid #202922;
+}
+.hud-time-bar{
+  flex:1;min-width:3px;background:#55e7ff;opacity:.72;
+  box-shadow:0 0 8px rgba(85,231,255,.10);
+}
+.hud-time-bar:hover{opacity:1;background:#b7ff38}
+.hud-empty{color:#536058;font:10px 'IBM Plex Mono';padding:18px 0}
 .event-grid{
   border:1px solid #27312b;
   background:#060908;
@@ -543,18 +570,48 @@ with tab_cloud:
             st.markdown('<div class="sectionline">performance vectors</div>',unsafe_allow_html=True)
             loc=df.groupby("location_tag")["engaged"].mean().mul(100).sort_values(ascending=False)
             camp=df.groupby("campaign")["engaged"].mean().mul(100).sort_values(ascending=False)
+
+            def hud_bar_chart(series, title):
+                if series.empty:
+                    return f'<div class="metric-chart"><div class="metric-chart-title">{title}</div><div class="hud-empty">NO TELEMETRY AVAILABLE</div></div>'
+                max_value=max(float(series.max()),1.0)
+                rows=[]
+                for label,value in series.items():
+                    width=max(0,min(float(value)/max_value*100,100))
+                    rows.append(
+                        f'<div class="hud-bar-row">'
+                        f'<div class="hud-bar-label">{label}</div>'
+                        f'<div class="hud-bar-track"><div class="hud-bar-fill" style="width:{width:.1f}%"></div></div>'
+                        f'<div class="hud-bar-value">{float(value):.1f}%</div>'
+                        f'</div>'
+                    )
+                return f'<div class="metric-chart"><div class="metric-chart-title">{title}</div><div class="hud-bars">{"".join(rows)}</div></div>'
+
             x,y=st.columns(2)
             with x:
-                st.caption("LOCATION / ENGAGEMENT %")
-                st.bar_chart(loc)
+                st.markdown(hud_bar_chart(loc,"LOCATION / ENGAGEMENT %"),unsafe_allow_html=True)
             with y:
-                st.caption("CAMPAIGN / ENGAGEMENT %")
-                st.bar_chart(camp)
+                st.markdown(hud_bar_chart(camp,"CAMPAIGN / ENGAGEMENT %"),unsafe_allow_html=True)
 
             st.markdown('<div class="sectionline">attention timeline</div>',unsafe_allow_html=True)
             timeline=df.set_index("timestamp")["engaged"].resample("1min").agg(["count","sum"])
             timeline.columns=["events","engagements"]
-            st.area_chart(timeline)
+
+            if timeline.empty:
+                st.markdown('<div class="metric-chart"><div class="hud-empty">NO TIMELINE DATA</div></div>',unsafe_allow_html=True)
+            else:
+                peak=max(int(timeline["events"].max()),1)
+                bars=[]
+                for _,row in timeline.tail(60).iterrows():
+                    height=max(4,min(float(row["events"])/peak*100,100))
+                    bars.append(f'<div class="hud-time-bar" style="height:{height:.1f}%" title="Events: {int(row["events"])} | Engagements: {int(row["engagements"])}"></div>')
+                st.markdown(
+                    '<div class="metric-chart">'
+                    '<div class="metric-chart-title">EVENT DENSITY / 1 MINUTE</div>'
+                    f'<div class="hud-timeline">{"".join(bars)}</div>'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
 
             st.markdown('<div class="sectionline">raw event stream</div>',unsafe_allow_html=True)
 
