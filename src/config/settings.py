@@ -19,9 +19,15 @@ class VisionConfig:
     eye_min_neighbors: int = 4
     eye_min_size: tuple[int, int] = (15, 15)
 
-    # "Engaged" = both eyes detected, not just one
+    # Both eyes must be detected continuously for this many seconds.
     min_eyes_for_engagement: int = 2
+    engagement_seconds: float = 5.0
+
+    # Temporary face tracking settings for multi-person sessions.
+    track_max_distance: int = 100
+    track_timeout: float = 1.5
 
     face_box_color: tuple[int, int, int] = (255, 180, 50)
     eye_box_color: tuple[int, int, int] = (50, 220, 90)
+    engaged_box_color: tuple[int, int, int] = (0, 255, 255)
     box_thickness: int = 2
