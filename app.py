@@ -448,26 +448,39 @@ with tab_edge:
                 unsafe_allow_html=True,
             )
         else:
-            # Keep the cloud WebRTC connection simple and stable.
-            # TURN credentials can be added later through Streamlit secrets if a
-            # restrictive network prevents a direct ICE connection.
-            rtc_configuration = {
-                "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-            }
-            ctx = webrtc_streamer(
-                key="adpulse-camera",
-                mode=WebRtcMode.SENDRECV,
-                rtc_configuration=rtc_configuration,
-                video_processor_factory=lambda: AdPulseVideoProcessor(
+            # Localhost does not need a public STUN server. In fact, forcing
+            # Google's STUN server locally can make the connection hang on networks
+            # that block or delay STUN traffic. Remote deployments still get STUN.
+            host = str(st.context.headers.get("host", "")).lower()
+            is_local = (
+                host.startswith("localhost")
+                or host.startswith("127.0.0.1")
+                or host.startswith("[::1]")
+            )
+
+            webrtc_kwargs = {
+                "key": "adpulse-camera",
+                "mode": WebRtcMode.SENDRECV,
+                "video_processor_factory": lambda: AdPulseVideoProcessor(
                     event_id=event_id,
                     event_name=event_name,
                     location=location,
                     campaign=campaign,
                     db_path=logger.db_path,
                 ),
-                media_stream_constraints={"video": True, "audio": False},
-                async_processing=True,
-            )
+                "media_stream_constraints": {"video": True, "audio": False},
+                "async_processing": True,
+            }
+
+            # streamlit-webrtc's basic localhost configuration intentionally
+            # omits rtc_configuration. Remote hosts use STUN and may later add
+            # TURN credentials through Streamlit secrets if required.
+            if not is_local:
+                webrtc_kwargs["rtc_configuration"] = {
+                    "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+                }
+
+            ctx = webrtc_streamer(**webrtc_kwargs)
 
             if ctx.state.playing:
                 st.markdown(
