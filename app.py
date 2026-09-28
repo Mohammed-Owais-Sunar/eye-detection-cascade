@@ -14,7 +14,7 @@ from src.vision.detector import EyeDetector
 from src.data_layer.logger import DetectionLogger
 
 st.set_page_config(
-    page_title="Campus Ad Analytics",
+    page_title="VisionGuard · Spatial Analytics",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -110,7 +110,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-tab_edge, tab_cloud = st.tabs(["🔴 Edge Sensor (Local)", "📈 Cloud Analytics (Global)"])
+tab_edge, tab_cloud = st.tabs(["🔴 Vision Engine", "📈 Analytics Studio"])
 
 # =========================================================
 # EDGE SENSOR TAB
@@ -147,6 +147,7 @@ with tab_edge:
         live_ph = st.empty()
         latency_ph = st.empty()
         session_ph = st.empty()
+        people_ph = st.empty()
 
     with left:
         st.markdown("### ◉ Live vision feed")
@@ -221,6 +222,15 @@ with tab_edge:
                 rate_ph.metric("📈 Conversion", f"{rate:.1f}%")
                 live_ph.metric("👁️ Looking now", f"{looking_now} · engaged {engaged_now}")
                 latency_ph.metric("🧠 Vision latency", f"{result.latency_ms:.1f} ms")
+
+                if result.persons:
+                    people_lines = ["**LIVE TRACKS**"]
+                    for person in result.persons:
+                        state = "🎯 ENGAGED" if person.engaged else ("👁️ LOOKING" if person.looking else "◌ SEEN")
+                        people_lines.append(f"**Person {person.track_id}** · {state} · {person.dwell_time:.1f}s")
+                    people_ph.markdown("\n\n".join(people_lines))
+                else:
+                    people_ph.caption("LIVE TRACKS · none detected")
 
                 if st.session_state.session_started_at:
                     elapsed = int(time.time() - st.session_state.session_started_at)
