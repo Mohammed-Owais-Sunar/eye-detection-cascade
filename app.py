@@ -5,22 +5,23 @@ import sqlite3
 import time
 import sys
 from pathlib import Path
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
+from src.vision.webcam_processor import AdPulseVideoProcessor
 
 root_path = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(root_path))
 
-from src.vision.detector import EyeDetector
 from src.data_layer.logger import DetectionLogger
 
 st.set_page_config(
-    page_title="VISIONGUARD // CONTROL ROOM",
+    page_title="ADPULSE // CONTROL ROOM",
     page_icon="◉",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # =========================================================
-# VISIONGUARD // CONTROL ROOM UI
+# ADPULSE // CONTROL ROOM UI
 # =========================================================
 st.markdown("""
 <style>
@@ -337,14 +338,14 @@ logger=DetectionLogger()
 # =========================================================
 st.markdown("""
 <div class="commandbar">
-  <span><span class="live-dot">●</span> VISIONGUARD / LOCAL NODE 01</span>
-  <span>EDGE COMPUTER VISION // REAL-TIME ATTENTION SYSTEM</span>
+  <span><span class="live-dot">●</span> ADPULSE / PRIVACY EDGE NODE</span>
+  <span>EDGE AD ANALYTICS // REAL-TIME ATTENTION SYSTEM</span>
   <span>BUILD 2.4.0</span>
 </div>
 <div class="brand">
   <div class="brand-mark">◉</div>
   <div>
-    <h1>VISIONGUARD</h1>
+    <h1>ADPULSE</h1>
     <div class="brand-sub">Spatial attention intelligence / control room</div>
   </div>
 </div>
@@ -361,7 +362,8 @@ with tab_edge:
     with mid:
         st.markdown('<div class="hud"><div class="hud-title">deployment vector</div>',unsafe_allow_html=True)
         location=st.selectbox("ZONE",["Library Entrance","O Building","Canteen","Hostel Gate","Sports Complex"],label_visibility="collapsed")
-        campaign=st.selectbox("CAMPAIGN",["New Product Launch","Limited-Time Offer","Festival Campaign","Brand Awareness"],label_visibility="collapsed")
+        st.caption("AD CAMPAIGN")
+        campaign=st.selectbox("AD CAMPAIGN",["New Product Launch","Limited-Time Offer","Festival Campaign","Brand Awareness"],label_visibility="collapsed")
         st.markdown('<div class="sectionline">engine</div>',unsafe_allow_html=True)
         if not st.session_state.running:
             if st.button("▶  INITIALIZE ENGINE",use_container_width=True):
@@ -390,7 +392,7 @@ with tab_edge:
                 st.warning("Terminate the feed before resetting.")
         st.markdown('</div>',unsafe_allow_html=True)
 
-        st.markdown('<div class="hud" style="margin-top:12px"><div class="hud-title">detection protocol</div><div class="notice">FACE TRACK → TWO EYES → CONTINUOUS 05.00 SEC → ENGAGEMENT<br><br>Each tracked person is counted once. Looking timer resets when eye detection is lost.</div></div>',unsafe_allow_html=True)
+        st.markdown('<div class="hud" style="margin-top:12px"><div class="hud-title">detection protocol</div><div class="notice">FACE TRACK → TWO EYES → CONTINUOUS 05.00 SEC → AD ENGAGEMENT<br><br>Each tracked person is counted once. No camera frames or face images are stored. Temporary video processing is used only during the active session.</div></div>',unsafe_allow_html=True)
 
     with right:
         st.markdown('<div class="hud"><div class="hud-title">system telemetry</div>',unsafe_allow_html=True)
@@ -410,67 +412,79 @@ with tab_edge:
         st.markdown('</div>',unsafe_allow_html=True)
 
     if st.session_state.running:
-        detector=EyeDetector()
-        cap=cv2.VideoCapture(0)
-        prev_time=time.time()
-        try:
-            while st.session_state.running:
-                ret,frame=cap.read()
-                if not ret:
-                    st.error("Camera unavailable.")
-                    st.session_state.running=False
-                    break
-                frame=cv2.flip(frame,1)
-                result=detector.process_frame(frame)
-                st.session_state.total_frames+=1
-                st.session_state.last_latency=result.latency_ms
-                now=time.time()
-                fps=1.0/max(now-prev_time,1e-6)
-                prev_time=now
+        # Browser webcam via WebRTC. Frames are processed transiently in memory;
+        # they are never written to disk or added to the telemetry database.
+        consent = st.checkbox(
+            "I CONSENT TO TEMPORARY CAMERA PROCESSING FOR THIS SESSION",
+            key="camera_consent",
+        )
+        if not consent:
+            stframe.markdown(
+                '<div class="notice" style="height:430px;display:flex;align-items:center;justify-content:center;text-align:center">'
+                'CAMERA PAUSED<br><br>GRANT SESSION CONSENT TO START BROWSER CAMERA'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            rtc_configuration = RTCConfiguration({
+                "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+            })
+            ctx = webrtc_streamer(
+                key="adpulse-camera",
+                mode=WebRtcMode.SENDRECV,
+                rtc_configuration=rtc_configuration,
+                video_processor_factory=lambda: AdPulseVideoProcessor(
+                    location=location,
+                    campaign=campaign,
+                    db_path=logger.db_path,
+                ),
+                media_stream_constraints={"video": True, "audio": False},
+                async_processing=True,
+            )
 
-                for person in result.persons:
-                    if person.track_id not in st.session_state.seen_track_ids:
-                        st.session_state.seen_track_ids.add(person.track_id)
-                        st.session_state.session_impressions+=1
-                    if person.engaged and person.track_id not in st.session_state.engaged_track_ids:
-                        st.session_state.engaged_track_ids.add(person.track_id)
-                        st.session_state.session_engagements+=1
-                        logger.log_interaction(location,campaign,person.dwell_time,True,False)
+            if ctx.state.playing:
+                st.markdown(
+                    '<div class="notice">PRIVACY EDGE ACTIVE // VIDEO FRAMES ARE PROCESSED IN MEMORY '
+                    'AND ARE NOT SAVED AS PHOTOS OR VIDEO.</div>',
+                    unsafe_allow_html=True,
+                )
 
-                if result.face_count>0:
-                    st.session_state.last_face_seen=now
-
-                stframe.image(cv2.cvtColor(result.annotated_frame,cv2.COLOR_BGR2RGB),use_container_width=True)
-
-                looking=sum(1 for p in result.persons if p.looking)
-                engaged=sum(1 for p in result.persons if p.engaged)
-                st.session_state.peak_people=max(st.session_state.peak_people,len(result.persons))
-                st.session_state.peak_looking=max(st.session_state.peak_looking,looking)
-                rate=st.session_state.session_engagements/max(st.session_state.session_impressions,1)*100
-                imp_ph.markdown(f'<div class="micro">UNIQUE PEOPLE</div><div class="big-number">{st.session_state.session_impressions:02d}</div>',unsafe_allow_html=True)
-                eng_ph.markdown(f'<div class="micro">ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>',unsafe_allow_html=True)
-                rate_ph.markdown(f'<div class="micro">CONVERSION</div><div class="big-number">{rate:04.1f}%</div>',unsafe_allow_html=True)
-                live_ph.markdown(f'<div class="signal"><span>looking now</span><b>{looking:02d}</b></div><div class="signal"><span>engaged now</span><b>{engaged:02d}</b></div>',unsafe_allow_html=True)
-                peak_ph.markdown(f'<div class="signal"><span>peak audience</span><b>{st.session_state.peak_people:02d}</b></div><div class="signal"><span>peak looking</span><b>{st.session_state.peak_looking:02d}</b></div>',unsafe_allow_html=True)
-                latency_ph.metric("LATENCY",f"{result.latency_ms:.1f} ms")
-                fps_ph.metric("FRAME RATE",f"{fps:.1f} FPS")
-                if st.session_state.session_started_at:
-                    elapsed=int(time.time()-st.session_state.session_started_at)
-                    session_ph.metric("SESSION",f"{elapsed//60:02d}:{elapsed%60:02d}")
-
-                if result.persons:
-                    rows=[]
-                    for p in result.persons:
-                        state="ENGAGED" if p.engaged else ("LOOKING" if p.looking else "SEEN")
-                        cls="track engaged" if p.engaged else "track"
-                        rows.append(f'<div class="{cls}">P{p.track_id} / {state}<span class="time">{p.dwell_time:.1f}s</span></div>')
-                    people_ph.markdown("".join(rows),unsafe_allow_html=True)
+            processor = ctx.video_processor
+            if processor is not None:
+                snapshot = processor.snapshot()
+                st.session_state.session_impressions = snapshot["unique_people"]
+                st.session_state.session_engagements = snapshot["engagements"]
+                st.session_state.peak_people = max(st.session_state.peak_people, snapshot["peak_people"])
+                st.session_state.peak_looking = max(st.session_state.peak_looking, snapshot["peak_looking"])
+                latency_ph.metric("LATENCY", f'{snapshot["latency_ms"]:.1f} ms')
+                fps_ph.metric("FRAME RATE", f'{snapshot["fps"]:.1f} FPS')
+                rate = st.session_state.session_engagements / max(st.session_state.session_impressions, 1) * 100
+                imp_ph.markdown(f'<div class="micro">UNIQUE VIEWERS</div><div class="big-number">{st.session_state.session_impressions:02d}</div>', unsafe_allow_html=True)
+                eng_ph.markdown(f'<div class="micro">AD ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>', unsafe_allow_html=True)
+                rate_ph.markdown(f'<div class="micro">ENGAGEMENT RATE</div><div class="big-number">{rate:04.1f}%</div>', unsafe_allow_html=True)
+                live_ph.markdown(
+                    f'<div class="signal"><span>looking now</span><b>{snapshot["looking_now"]:02d}</b></div>'
+                    f'<div class="signal"><span>engaged now</span><b>{snapshot["engaged_now"]:02d}</b></div>',
+                    unsafe_allow_html=True,
+                )
+                peak_ph.markdown(
+                    f'<div class="signal"><span>peak audience</span><b>{snapshot["peak_people"]:02d}</b></div>'
+                    f'<div class="signal"><span>peak looking</span><b>{snapshot["peak_looking"]:02d}</b></div>',
+                    unsafe_allow_html=True,
+                )
+                if snapshot["tracks_html"]:
+                    people_ph.markdown(snapshot["tracks_html"], unsafe_allow_html=True)
                 else:
-                    people_ph.markdown('<div class="micro">NO ACTIVE TRACKS</div>',unsafe_allow_html=True)
-        finally:
-            cap.release()
+                    people_ph.markdown('<div class="micro">NO ACTIVE TRACKS</div>', unsafe_allow_html=True)
+            else:
+                stframe.markdown(
+                    '<div class="notice" style="height:430px;display:flex;align-items:center;justify-content:center;text-align:center">'
+                    'BROWSER CAMERA READY<br><br>PRESS START ON THE CAMERA CONTROL'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
     else:
-        stframe.markdown('<div class="notice" style="height:430px;display:flex;align-items:center;justify-content:center;text-align:center">SYSTEM STANDBY<br><br>INITIALIZE ENGINE TO OPEN THE ATTENTION FIELD</div>',unsafe_allow_html=True)
+
         fps_ph.metric("FRAME RATE","—")
         imp_ph.markdown(f'<div class="micro">UNIQUE PEOPLE</div><div class="big-number">{st.session_state.session_impressions:02d}</div>',unsafe_allow_html=True)
         eng_ph.markdown(f'<div class="micro">ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>',unsafe_allow_html=True)
@@ -501,7 +515,7 @@ with tab_cloud:
         f'''
         <div class="security-strip">
           <div>
-            <div class="security-kicker">LOCAL DATA VAULT</div>
+            <div class="security-kicker">TELEMETRY VAULT</div>
             <div class="security-main">{archive_state}</div>
           </div>
           <div class="security-stat">
@@ -511,7 +525,7 @@ with tab_cloud:
             <span>CAMERA FRAMES</span><b>NOT STORED</b>
           </div>
           <div class="security-stat">
-            <span>DATA LOCATION</span><b>LOCAL ONLY</b>
+            <span>CAMERA STORAGE</span><b>NONE</b>
           </div>
         </div>
         ''',
@@ -525,7 +539,7 @@ with tab_cloud:
             '<div class="danger-copy">'
             'This operation permanently removes every stored engagement event from '
             '<b>analytics.db</b> and resets the current session telemetry. '
-            'Camera frames are not stored.'
+            'Camera frames are processed transiently for detection and are not stored as photos or video.'
             '</div>'
             '</div>',
             unsafe_allow_html=True,
@@ -595,7 +609,7 @@ with tab_cloud:
             # Keep database IDs private from the presentation layer.
             # Generate stable, readable event IDs for the visible report.
             events=df.tail(100).copy().reset_index(drop=True)
-            events.insert(0,"event_id",[f"VG-E{i:03d}" for i in range(1,len(events)+1)])
+            events.insert(0,"event_id",[f"AP-E{i:03d}" for i in range(1,len(events)+1)])
 
             display_cols=[
                 "event_id","timestamp","location_tag","campaign",
@@ -620,8 +634,8 @@ with tab_cloud:
                 f'<div class="event-grid"><div class="event-grid-scroll">{table_html}</div></div>',
                 unsafe_allow_html=True,
             )
-            st.download_button("EXPORT TELEMETRY / CSV",df.to_csv(index=False),"visionguard_telemetry.csv","text/csv")
+            st.download_button("EXPORT TELEMETRY / CSV",df.to_csv(index=False),"adpulse_telemetry.csv","text/csv")
     except Exception as e:
         st.error(f"Telemetry archive error: {e}")
 
-st.markdown('<div class="footerline"><span>VISIONGUARD / LOCAL-FIRST COMPUTER VISION</span><span>NO CAMERA FRAMES STORED</span><span>5 SEC ATTENTION PROTOCOL</span></div>',unsafe_allow_html=True)
+st.markdown('<div class="footerline"><span>ADPULSE / PRIVACY-FIRST AD ATTENTION</span><span>NO CAMERA FRAMES STORED / TRANSIENT PROCESSING ONLY</span><span>5 SEC ATTENTION PROTOCOL</span></div>',unsafe_allow_html=True)
