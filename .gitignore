@@ -1,0 +1,17 @@
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local runtime data
+data/*.db
+data/*.sqlite3
+
+# System artifacts
+.DS_Store
+Thumbs.db
+.vscode/
