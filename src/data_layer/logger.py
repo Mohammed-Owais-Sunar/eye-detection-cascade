@@ -37,6 +37,19 @@ class DetectionLogger:
                 active BOOLEAN DEFAULT 1
             )""")
 
+            default_locations = [
+                ("Library Entrance", "Library"),
+                ("O Building", "Academic Block"),
+                ("Canteen", "Student Center"),
+                ("Hostel Gate", "Hostel"),
+                ("Sports Complex", "Sports"),
+            ]
+            for location_name, building in default_locations:
+                conn.execute(
+                    "INSERT OR IGNORE INTO ad_locations (name, building, active) VALUES (?, ?, 1)",
+                    (location_name, building),
+                )
+
             conn.execute("""CREATE TABLE IF NOT EXISTS ad_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
