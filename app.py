@@ -417,15 +417,55 @@ with tab_edge:
         st.markdown('<div class="hud" style="margin-top:12px"><div class="hud-title">detection protocol</div><div class="notice">FACE TRACK → TWO EYES → CONTINUOUS 05.00 SEC → AD ENGAGEMENT<br><br>Each tracked person is counted once. No camera frames or face images are stored. Temporary video processing is used only during the active session.</div></div>',unsafe_allow_html=True)
 
     with right:
-        st.markdown('<div class="hud"><div class="hud-title">system telemetry</div>',unsafe_allow_html=True)
-        status="ONLINE" if st.session_state.running else "STANDBY"
-        status_cls="status-online" if st.session_state.running else "status-idle"
-        st.markdown(f'<div class="signal"><span>engine</span><b class="{status_cls}">{status}</b></div>',unsafe_allow_html=True)
-        imp_ph=st.empty(); eng_ph=st.empty(); rate_ph=st.empty(); live_ph=st.empty(); latency_ph=st.empty(); session_ph=st.empty(); peak_ph=st.empty()
-        st.markdown('</div>',unsafe_allow_html=True)
-        st.markdown('<div class="hud" style="margin-top:12px"><div class="hud-title">active tracks</div>',unsafe_allow_html=True)
-        people_ph=st.empty()
-        st.markdown('</div>',unsafe_allow_html=True)
+        @st.fragment(run_every=1.0)
+        def live_telemetry():
+            st.markdown('<div class="hud"><div class="hud-title">system telemetry</div>',unsafe_allow_html=True)
+            status="ONLINE" if st.session_state.running else "STANDBY"
+            status_cls="status-online" if st.session_state.running else "status-idle"
+            st.markdown(f'<div class="signal"><span>engine</span><b class="{status_cls}">{status}</b></div>',unsafe_allow_html=True)
+
+            processor=st.session_state.get("adpulse_processor")
+            if st.session_state.running and processor is not None:
+                snapshot=processor.snapshot()
+                st.session_state.session_impressions=snapshot["unique_people"]
+                st.session_state.session_engagements=snapshot["engagements"]
+                st.session_state.peak_people=max(st.session_state.peak_people,snapshot["peak_people"])
+                st.session_state.peak_looking=max(st.session_state.peak_looking,snapshot["peak_looking"])
+
+                rate=st.session_state.session_engagements/max(st.session_state.session_impressions,1)*100
+                st.markdown(f'<div class="micro">UNIQUE VIEWERS</div><div class="big-number">{st.session_state.session_impressions:02d}</div>',unsafe_allow_html=True)
+                st.markdown(f'<div class="micro">AD ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>',unsafe_allow_html=True)
+                st.markdown(f'<div class="micro">ENGAGEMENT RATE</div><div class="big-number">{rate:04.1f}%</div>',unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="signal"><span>looking now</span><b>{snapshot["looking_now"]:02d}</b></div>'
+                    f'<div class="signal"><span>engaged now</span><b>{snapshot["engaged_now"]:02d}</b></div>',
+                    unsafe_allow_html=True,
+                )
+                st.metric("LATENCY",f'{snapshot["latency_ms"]:.1f} ms')
+                st.markdown(
+                    f'<div class="signal"><span>peak audience</span><b>{snapshot["peak_people"]:02d}</b></div>'
+                    f'<div class="signal"><span>peak looking</span><b>{snapshot["peak_looking"]:02d}</b></div>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown('</div>',unsafe_allow_html=True)
+
+                st.markdown('<div class="hud" style="margin-top:12px"><div class="hud-title">active tracks</div>',unsafe_allow_html=True)
+                if snapshot["tracks_html"]:
+                    st.markdown(snapshot["tracks_html"],unsafe_allow_html=True)
+                else:
+                    st.markdown('<div class="micro">NO ACTIVE TRACKS</div>',unsafe_allow_html=True)
+                st.markdown('</div>',unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="micro">UNIQUE VIEWERS</div><div class="big-number">00</div>',unsafe_allow_html=True)
+                st.markdown('<div class="micro">AD ENGAGEMENTS</div><div class="big-number">00</div>',unsafe_allow_html=True)
+                st.markdown('<div class="micro">ENGAGEMENT RATE</div><div class="big-number">00.0%</div>',unsafe_allow_html=True)
+                st.markdown('<div class="micro">ENGINE STANDBY</div>',unsafe_allow_html=True)
+                st.metric("LATENCY","—")
+                st.markdown(f'<div class="signal"><span>peak audience</span><b>{st.session_state.peak_people:02d}</b></div><div class="signal"><span>peak looking</span><b>{st.session_state.peak_looking:02d}</b></div>',unsafe_allow_html=True)
+                st.markdown('</div>',unsafe_allow_html=True)
+                st.markdown('<div class="hud" style="margin-top:12px"><div class="hud-title">active tracks</div><div class="micro">NO ACTIVE TRACKS</div></div>',unsafe_allow_html=True)
+
+        live_telemetry()
 
     with left:
         st.markdown('<div class="hud"><div class="hud-title">camera / attention field</div>',unsafe_allow_html=True)
@@ -467,7 +507,7 @@ with tab_edge:
                     "media_stream_constraints": {"video": True, "audio": False},
                     "async_processing": True,
                     "video_html_attrs": {
-                        "style": {"width": "100%", "height": "430px", "objectFit": "contain"},
+                        "style": {"width": "100%", "height": "430px", "objectFit": "contain", "transform": "scaleX(-1)"},
                         "controls": False,
                         "autoPlay": True,
                         "muted": True,
@@ -490,50 +530,14 @@ with tab_edge:
 
                 processor = ctx.video_processor
                 if processor is not None:
-                    snapshot = processor.snapshot()
-                    st.session_state.session_impressions = snapshot["unique_people"]
-                    st.session_state.session_engagements = snapshot["engagements"]
-                    st.session_state.peak_people = max(st.session_state.peak_people, snapshot["peak_people"])
-                    st.session_state.peak_looking = max(st.session_state.peak_looking, snapshot["peak_looking"])
-
-                    fps_ph_left.metric("FRAME RATE", f'{snapshot["fps"]:.1f} FPS')
-
-                    latency_ph.metric("LATENCY", f'{snapshot["latency_ms"]:.1f} ms')
-                    rate = st.session_state.session_engagements / max(st.session_state.session_impressions, 1) * 100
-                    imp_ph.markdown(f'<div class="micro">UNIQUE VIEWERS</div><div class="big-number">{st.session_state.session_impressions:02d}</div>', unsafe_allow_html=True)
-                    eng_ph.markdown(f'<div class="micro">AD ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>', unsafe_allow_html=True)
-                    rate_ph.markdown(f'<div class="micro">ENGAGEMENT RATE</div><div class="big-number">{rate:04.1f}%</div>', unsafe_allow_html=True)
-                    live_ph.markdown(
-                        f'<div class="signal"><span>looking now</span><b>{snapshot["looking_now"]:02d}</b></div>'
-                        f'<div class="signal"><span>engaged now</span><b>{snapshot["engaged_now"]:02d}</b></div>',
-                        unsafe_allow_html=True,
-                    )
-                    peak_ph.markdown(
-                        f'<div class="signal"><span>peak audience</span><b>{snapshot["peak_people"]:02d}</b></div>'
-                        f'<div class="signal"><span>peak looking</span><b>{snapshot["peak_looking"]:02d}</b></div>',
-                        unsafe_allow_html=True,
-                    )
-                    if snapshot["tracks_html"]:
-                        people_ph.markdown(snapshot["tracks_html"], unsafe_allow_html=True)
-                    else:
-                        people_ph.markdown('<div class="micro">NO ACTIVE TRACKS</div>', unsafe_allow_html=True)
+                    st.session_state.adpulse_processor = processor
+                    fps_ph_left.metric("FRAME RATE", f'{processor.snapshot()["fps"]:.1f} FPS')
                 else:
                     fps_ph_left.metric("FRAME RATE", "0.0 FPS")
         else:
             fps_ph_left.metric("FRAME RATE","—")
 
         st.markdown('</div>',unsafe_allow_html=True)
-
-    if not st.session_state.running:
-        imp_ph.markdown(f'<div class="micro">UNIQUE VIEWERS</div><div class="big-number">{st.session_state.session_impressions:02d}</div>',unsafe_allow_html=True)
-        eng_ph.markdown(f'<div class="micro">ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>',unsafe_allow_html=True)
-        rate=st.session_state.session_engagements/max(st.session_state.session_impressions,1)*100
-        rate_ph.markdown(f'<div class="micro">ENGAGEMENT RATE</div><div class="big-number">{rate:04.1f}%</div>',unsafe_allow_html=True)
-        live_ph.markdown('<div class="micro">ENGINE STANDBY</div>',unsafe_allow_html=True)
-        peak_ph.markdown(f'<div class="signal"><span>peak audience</span><b>{st.session_state.peak_people:02d}</b></div><div class="signal"><span>peak looking</span><b>{st.session_state.peak_looking:02d}</b></div>',unsafe_allow_html=True)
-        latency_ph.metric("LATENCY","—")
-        session_ph.metric("SESSION","00:00")
-        people_ph.markdown('<div class="micro">NO ACTIVE TRACKS</div>',unsafe_allow_html=True)
 
 # =========================================================
 # INTELLIGENCE LOG
