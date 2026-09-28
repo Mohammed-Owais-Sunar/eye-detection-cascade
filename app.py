@@ -361,7 +361,7 @@ with tab_edge:
     with mid:
         st.markdown('<div class="hud"><div class="hud-title">deployment vector</div>',unsafe_allow_html=True)
         location=st.selectbox("ZONE",["Library Entrance","O Building","Canteen","Hostel Gate","Sports Complex"],label_visibility="collapsed")
-        campaign=st.selectbox("CAMPAIGN",["Mid-Sem Exam Timetable","Hackathon Poster","Campus Election","Club Recruitment"],label_visibility="collapsed")
+        campaign=st.selectbox("CAMPAIGN",["New Product Launch","Limited-Time Offer","Festival Campaign","Brand Awareness"],label_visibility="collapsed")
         st.markdown('<div class="sectionline">engine</div>',unsafe_allow_html=True)
         if not st.session_state.running:
             if st.button("▶  INITIALIZE ENGINE",use_container_width=True):
