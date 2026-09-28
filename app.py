@@ -292,12 +292,19 @@ input{font-family:'IBM Plex Mono'!important}
   .security-strip>div:nth-child(2){border-right:0}
 }
 /* FINAL HUD POLISH */
-[data-testid="stExpander"] summary{
+[data-testid="stExpander"] details > summary,
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] button{
   background:#0a0f0c!important;
+  background-color:#0a0f0c!important;
   color:#dce8df!important;
+  border-color:#27312b!important;
 }
-[data-testid="stExpander"] summary:hover{
+[data-testid="stExpander"] details > summary:hover,
+[data-testid="stExpander"] summary:hover,
+[data-testid="stExpander"] button:hover{
   background:#101711!important;
+  background-color:#101711!important;
   color:var(--acid)!important;
 }
 [data-testid="stCheckbox"] label{
