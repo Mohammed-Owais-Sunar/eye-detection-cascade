@@ -6,7 +6,6 @@ import time
 import sys
 from pathlib import Path
 
-# Pathing fix so Streamlit Cloud can find the src modules
 root_path = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(root_path))
 
@@ -14,328 +13,393 @@ from src.vision.detector import EyeDetector
 from src.data_layer.logger import DetectionLogger
 
 st.set_page_config(
-    page_title="VisionGuard · Spatial Analytics",
-    page_icon="🎯",
+    page_title="VISIONGUARD // CONTROL ROOM",
+    page_icon="◉",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ---------- Visual system ----------
+# =========================================================
+# VISIONGUARD // CONTROL ROOM UI
+# =========================================================
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
-:root {color-scheme:dark}
-html, body, [data-testid="stApp"], [data-testid="stAppViewContainer"] {
-  background: radial-gradient(ellipse 75% 55% at 78% -10%,rgba(99,102,241,.19),transparent 75%),
-              radial-gradient(ellipse 60% 45% at 5% 30%,rgba(6,182,212,.09),transparent 80%),#080d1b;
-  color:#e8efff;font-family:'DM Sans',sans-serif;
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root{
+  color-scheme:dark;
+  --bg:#050607;
+  --panel:#090c0d;
+  --line:#1c2420;
+  --text:#e7eee9;
+  --muted:#748078;
+  --acid:#b7ff38;
+  --cyan:#55e7ff;
+  --orange:#ff8b3d;
+  --red:#ff4d4d;
 }
-[data-testid="stHeader"] {background:transparent}
-.block-container {max-width:1480px;padding-top:1.8rem;padding-bottom:4rem}
-h1,h2,h3 {font-family:'Space Grotesk',sans-serif;letter-spacing:-.035em}
-h1 {font-size:clamp(2.1rem,4vw,3.5rem)!important;line-height:1.1!important;
-background:linear-gradient(105deg,#fff 20%,#9bd7ff 55%,#a5a1ff 95%);
--webkit-background-clip:text;-webkit-text-fill-color:transparent}
-h3 {color:#f3f6ff}
-p, label, [data-testid="stCaptionContainer"] {color:#a7b5d2}
-[data-testid="stSidebar"] {background:#0c1427;border-right:1px solid #253351}
-[data-testid="stTabs"] [data-baseweb="tab-list"] {gap:12px;border-bottom:1px solid #283450;padding-bottom:8px}
-[data-testid="stTabs"] button[role="tab"] {border-radius:12px;padding:10px 22px;color:#9faecc;
-transition:background .25s,color .25s,transform .25s}
-[data-testid="stTabs"] button[role="tab"]:hover {background:#1c2a47;color:#fff;transform:translateY(-2px)}
-[data-testid="stTabs"] button[aria-selected="true"] {color:#8fe6ff!important;background:#172746!important}
-[data-testid="stMetric"] {background:linear-gradient(135deg,rgba(26,41,72,.94),rgba(13,23,45,.95));
-border:1px solid #304466;border-radius:20px;padding:20px 22px;
-box-shadow:0 10px 36px #0003;transition:transform .25s,border-color .25s,box-shadow .25s}
-[data-testid="stMetric"]:hover {transform:translateY(-4px);border-color:#47b9e8;box-shadow:0 16px 40px #38bdf822}
-[data-testid="stMetricLabel"] {color:#9eb0d0}
-[data-testid="stMetricValue"] {color:#f5f8ff;font-family:'Space Grotesk',sans-serif}
-[data-testid="stImage"] img {border-radius:22px;border:1px solid #344b70;box-shadow:0 20px 60px #0008}
-.stButton>button, [data-testid="stDownloadButton"] button {border-radius:13px!important;
-background:linear-gradient(110deg,#26d3ed,#6d7cff)!important;border:1px solid #72dfff55!important;
-color:#061329!important;font-weight:800!important;letter-spacing:.015em;
-box-shadow:0 7px 22px #3a8efa33;transition:transform .23s,box-shadow .23s,filter .23s!important}
-.stButton>button:hover, [data-testid="stDownloadButton"] button:hover {transform:translateY(-3px) scale(1.015);
-filter:brightness(1.12);box-shadow:0 12px 30px #38bdf866}
-.stButton>button:active {transform:translateY(0) scale(.98)}
-[data-testid="stForm"] {background:#101c32;border:1px solid #304466;border-radius:20px;padding:20px}
-[data-baseweb="select"]>div, [data-baseweb="input"]>div {background:#101c32!important;
-border-color:#354c70!important;border-radius:12px!important}
-[data-testid="stAlert"] {border-radius:16px}
-[data-testid="stDataFrame"], [data-testid="stVegaLiteChart"] {border:1px solid #304466;border-radius:16px;overflow:hidden}
-.hero-card {padding:25px 28px;margin-bottom:24px;border:1px solid #304466;border-radius:24px;
-background:linear-gradient(120deg,rgba(31,52,93,.86),rgba(20,28,55,.72));
-box-shadow:0 18px 55px #0004;position:relative;overflow:hidden}
-.hero-card:after {content:"";position:absolute;width:220px;height:220px;border-radius:50%;
-background:#50baff22;filter:blur(55px);right:-50px;top:-80px;pointer-events:none}
-.eyebrow {font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:800;color:#74e5f9}
-.hero-card p {font-size:15px;margin:8px 0 0;color:#b8c8e4}
-.pill {display:inline-block;padding:7px 13px;border-radius:100px;background:#113b42;
-border:1px solid #236c70;color:#84f6d8;font-size:12px;font-weight:800;margin-bottom:12px}
-.section-hint {color:#a5b5d3;font-size:13px;margin-top:-8px;margin-bottom:18px}
-#MainMenu,footer {visibility:hidden}
-@media(max-width:720px){.block-container{padding:1rem}.hero-card{padding:18px}}
+
+html,body,[data-testid="stApp"],[data-testid="stAppViewContainer"]{
+  background:
+    linear-gradient(rgba(183,255,56,.018) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(183,255,56,.018) 1px,transparent 1px),
+    var(--bg);
+  background-size:32px 32px;
+  color:var(--text);
+  font-family:'Space Grotesk',sans-serif;
+}
+[data-testid="stHeader"]{background:rgba(5,6,7,.88)}
+.block-container{max-width:1540px;padding:18px 30px 70px}
+[data-testid="stSidebar"]{
+  background:#070909;
+  border-right:1px solid var(--line);
+}
+[data-testid="stSidebar"] *{font-family:'Space Grotesk',sans-serif}
+#MainMenu,footer{visibility:hidden}
+
+.commandbar{
+  display:flex;justify-content:space-between;align-items:center;
+  border-top:1px solid #263029;border-bottom:1px solid #263029;
+  padding:9px 0;margin-bottom:22px;
+  font-family:'IBM Plex Mono',monospace;font-size:11px;
+  letter-spacing:.13em;color:#7d8b82;
+}
+.live-dot{color:var(--acid)}
+.brand{
+  display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:end;
+  margin:8px 0 26px;
+}
+.brand-mark{
+  width:70px;height:70px;border:1px solid var(--acid);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--acid);font:600 28px 'IBM Plex Mono';
+  box-shadow:inset 0 0 25px rgba(183,255,56,.06),0 0 24px rgba(183,255,56,.05);
+}
+.brand h1{
+  margin:0!important;font-size:clamp(35px,5vw,72px)!important;
+  letter-spacing:-.065em!important;line-height:.86!important;
+  color:#eef4ef!important;-webkit-text-fill-color:#eef4ef!important;
+  background:none!important;
+}
+.brand-sub{
+  margin-top:10px;color:#7d8b82;font:12px 'IBM Plex Mono';
+  letter-spacing:.18em;text-transform:uppercase;
+}
+.hud{
+  border:1px solid #27312b;background:rgba(8,11,10,.92);
+  position:relative;padding:18px;overflow:hidden;
+}
+.hud:before,.hud:after{
+  content:"";position:absolute;width:18px;height:18px;pointer-events:none;
+}
+.hud:before{left:-1px;top:-1px;border-left:2px solid var(--acid);border-top:2px solid var(--acid)}
+.hud:after{right:-1px;bottom:-1px;border-right:2px solid var(--acid);border-bottom:2px solid var(--acid)}
+.hud-title{
+  font:11px 'IBM Plex Mono';letter-spacing:.16em;color:#738078;
+  text-transform:uppercase;border-bottom:1px solid #202923;padding-bottom:10px;margin-bottom:14px;
+}
+.feed-wrap{
+  position:relative;background:#020303;border:1px solid #27312b;
+  padding:5px;box-shadow:0 0 0 1px #090d0b;
+}
+.feed-wrap:after{
+  content:"";position:absolute;left:5px;right:5px;height:1px;
+  background:rgba(183,255,56,.28);top:18%;
+  box-shadow:0 90px rgba(183,255,56,.08),0 180px rgba(183,255,56,.08),0 270px rgba(183,255,56,.08);
+  pointer-events:none;animation:scan 4s linear infinite;
+}
+@keyframes scan{0%{transform:translateY(0)}100%{transform:translateY(420px)}}
+[data-testid="stImage"] img{
+  border-radius:0!important;border:0!important;box-shadow:none!important;
+  filter:contrast(1.04) saturate(.86);
+}
+.track{
+  border-left:2px solid var(--acid);padding:8px 10px;margin:7px 0;
+  background:#0d120e;font:12px 'IBM Plex Mono';color:#d9e6dc;
+}
+.track.engaged{border-color:var(--orange);color:#fff0df}
+.track .time{float:right;color:var(--acid)}
+.track.engaged .time{color:var(--orange)}
+.signal{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 0;border-bottom:1px solid #1d251f;
+  font-family:'IBM Plex Mono';
+}
+.signal:last-child{border-bottom:0}
+.signal b{font-size:22px;color:#edf5ef}
+.signal span{font-size:10px;letter-spacing:.1em;color:#69766e;text-transform:uppercase}
+.big-number{
+  font:600 clamp(38px,5vw,68px) 'IBM Plex Mono';
+  letter-spacing:-.07em;color:var(--acid);line-height:1;
+}
+.micro{font:10px 'IBM Plex Mono';color:#69766e;letter-spacing:.1em;text-transform:uppercase}
+.status-online{color:var(--acid)}
+.status-idle{color:#69766e}
+.stButton>button,[data-testid="stDownloadButton"] button{
+  border-radius:0!important;border:1px solid #344139!important;
+  background:#0b0f0c!important;color:#dce8df!important;
+  font-family:'IBM Plex Mono'!important;font-size:11px!important;
+  letter-spacing:.08em!important;text-transform:uppercase;
+  box-shadow:none!important;transition:all .18s ease!important;
+}
+.stButton>button:hover,[data-testid="stDownloadButton"] button:hover{
+  border-color:var(--acid)!important;color:var(--acid)!important;
+  background:#111811!important;transform:none!important;
+  box-shadow:inset 0 0 18px rgba(183,255,56,.06)!important;
+}
+[data-testid="stMetric"]{
+  background:#080b09;border:0;border-top:1px solid #2a352e;border-radius:0;
+  padding:12px 4px;box-shadow:none;transition:border-color .2s;
+}
+[data-testid="stMetric"]:hover{border-top-color:var(--acid);transform:none;box-shadow:none}
+[data-testid="stMetricLabel"]{color:#6f7d74;font:10px 'IBM Plex Mono';text-transform:uppercase}
+[data-testid="stMetricValue"]{color:#edf5ef;font:600 25px 'IBM Plex Mono'}
+[data-testid="stTabs"] [data-baseweb="tab-list"]{
+  gap:0;border-bottom:1px solid #27312b;margin-bottom:22px;
+}
+[data-testid="stTabs"] button[role="tab"]{
+  border-radius:0!important;padding:11px 20px;color:#657168;
+  font:11px 'IBM Plex Mono';letter-spacing:.12em;text-transform:uppercase;
+}
+[data-testid="stTabs"] button[role="tab"]:hover{color:#fff;background:#0c100d}
+[data-testid="stTabs"] button[aria-selected="true"]{
+  color:var(--acid)!important;background:#0b100b!important;
+  box-shadow:inset 0 -2px var(--acid);
+}
+[data-baseweb="select"]>div{
+  background:#090d0b!important;border:1px solid #27312b!important;border-radius:0!important;
+}
+[data-testid="stExpander"]{border:1px solid #27312b!important;border-radius:0!important;background:#080b09}
+[data-testid="stAlert"]{border-radius:0!important}
+[data-testid="stDataFrame"],[data-testid="stVegaLiteChart"]{border:1px solid #27312b;border-radius:0;overflow:hidden}
+input{font-family:'IBM Plex Mono'!important}
+.sectionline{
+  display:flex;align-items:center;gap:12px;margin:18px 0 10px;
+  color:#7b887f;font:10px 'IBM Plex Mono';letter-spacing:.15em;text-transform:uppercase;
+}
+.sectionline:after{content:"";height:1px;background:#202922;flex:1}
+.notice{
+  border:1px dashed #39453d;padding:13px 15px;color:#8d9b92;
+  font:11px 'IBM Plex Mono';line-height:1.7;background:#080b09;
+}
+.footerline{
+  margin-top:35px;padding-top:12px;border-top:1px solid #202922;
+  display:flex;justify-content:space-between;color:#4e5a53;font:9px 'IBM Plex Mono';
+  letter-spacing:.12em;text-transform:uppercase;
+}
+@media(max-width:900px){.block-container{padding:12px}.brand{grid-template-columns:1fr}.brand-mark{display:none}}
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- State ----------
-if "running" not in st.session_state:
-    st.session_state.running = False
-if "session_impressions" not in st.session_state:
-    st.session_state.session_impressions = 0
-if "session_engagements" not in st.session_state:
-    st.session_state.session_engagements = 0
-if "last_face_seen" not in st.session_state:
-    st.session_state.last_face_seen = 0.0
-if "seen_track_ids" not in st.session_state:
-    st.session_state.seen_track_ids = set()
-if "engaged_track_ids" not in st.session_state:
-    st.session_state.engaged_track_ids = set()
-if "session_started_at" not in st.session_state:
-    st.session_state.session_started_at = None
-if "total_frames" not in st.session_state:
-    st.session_state.total_frames = 0
-if "last_latency" not in st.session_state:
-    st.session_state.last_latency = 0.0
+# =========================================================
+# STATE
+# =========================================================
+defaults={
+    "running":False,"session_impressions":0,"session_engagements":0,
+    "last_face_seen":0.0,"seen_track_ids":set(),"engaged_track_ids":set(),
+    "session_started_at":None,"total_frames":0,"last_latency":0.0
+}
+for key,value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key]=value
 
-logger = DetectionLogger()
-
-# ---------- Header ----------
-st.markdown("""
-<div class="hero-card">
-  <div class="pill">● VISION ENGINE · LIVE ANALYTICS</div>
-  <div class="eyebrow">CAMPUS INTELLIGENCE PLATFORM / V2.0</div>
-  <h1>Spatial Ad Analytics</h1>
-  <p>Understand attention in real time. Track multi-person engagement, discover campaign insights, and measure what matters.</p>
-</div>
-""", unsafe_allow_html=True)
-
-tab_edge, tab_cloud = st.tabs(["🔴 Vision Engine", "📈 Analytics Studio"])
+logger=DetectionLogger()
 
 # =========================================================
-# EDGE SENSOR TAB
+# HEADER
+# =========================================================
+st.markdown("""
+<div class="commandbar">
+  <span><span class="live-dot">●</span> VISIONGUARD / LOCAL NODE 01</span>
+  <span>EDGE COMPUTER VISION // REAL-TIME ATTENTION SYSTEM</span>
+  <span>BUILD 2.4.0</span>
+</div>
+<div class="brand">
+  <div class="brand-mark">◉</div>
+  <div>
+    <h1>VISIONGUARD</h1>
+    <div class="brand-sub">Spatial attention intelligence / control room</div>
+  </div>
+</div>
+""",unsafe_allow_html=True)
+
+tab_edge,tab_cloud=st.tabs(["◉  LIVE CONTROL ROOM","⌁  INTELLIGENCE LOG"])
+
+# =========================================================
+# LIVE CONTROL ROOM
 # =========================================================
 with tab_edge:
-    left, right = st.columns([3, 1])
+    left,mid,right=st.columns([6,2.25,2.0],gap="medium")
 
-    with right:
-        st.markdown("### ⚙️ Deployment")
-        location = st.selectbox("Campus Zone", [
-            "Library Entrance", "Tech Block", "Canteen", "Hostel Gate", "Sports Complex"
-        ])
-        campaign = st.selectbox("Active Campaign", [
-            "Tech Symposium Ad", "Hackathon Poster", "Campus Election", "Club Recruitment"
-        ])
-
-        st.markdown("### 📷 Camera controls")
+    with mid:
+        st.markdown('<div class="hud"><div class="hud-title">deployment vector</div>',unsafe_allow_html=True)
+        location=st.selectbox("ZONE",["Library Entrance","Tech Block","Canteen","Hostel Gate","Sports Complex"],label_visibility="collapsed")
+        campaign=st.selectbox("CAMPAIGN",["Tech Symposium Ad","Hackathon Poster","Campus Election","Club Recruitment"],label_visibility="collapsed")
+        st.markdown('<div class="sectionline">engine</div>',unsafe_allow_html=True)
         if not st.session_state.running:
-            if st.button("▶ Activate Edge Camera", use_container_width=True):
-                st.session_state.running = True
-                st.session_state.session_started_at = time.time()
-                st.session_state.seen_track_ids = set()
-                st.session_state.engaged_track_ids = set()
+            if st.button("▶  INITIALIZE ENGINE",use_container_width=True):
+                st.session_state.running=True
+                st.session_state.session_started_at=time.time()
+                st.session_state.seen_track_ids=set()
+                st.session_state.engaged_track_ids=set()
                 st.rerun()
         else:
-            if st.button("⏹ Stop Sensor", use_container_width=True):
-                st.session_state.running = False
+            if st.button("■  TERMINATE FEED",use_container_width=True):
+                st.session_state.running=False
                 st.rerun()
+        if st.button("↻  RESET SESSION",use_container_width=True):
+            if not st.session_state.running:
+                st.session_state.session_impressions=0
+                st.session_state.session_engagements=0
+                st.session_state.seen_track_ids=set()
+                st.session_state.engaged_track_ids=set()
+                st.session_state.session_started_at=None
+                st.rerun()
+            else:
+                st.warning("Terminate the feed before resetting.")
+        st.markdown('</div>',unsafe_allow_html=True)
 
-        st.markdown("### 📊 Session pulse")
-        imp_ph = st.empty()
-        eng_ph = st.empty()
-        rate_ph = st.empty()
-        live_ph = st.empty()
-        latency_ph = st.empty()
-        session_ph = st.empty()
-        people_ph = st.empty()
+        st.markdown('<div class="hud" style="margin-top:12px"><div class="hud-title">detection protocol</div><div class="notice">FACE TRACK → TWO EYES → CONTINUOUS 05.00 SEC → ENGAGEMENT<br><br>Each tracked person is counted once. Looking timer resets when eye detection is lost.</div></div>',unsafe_allow_html=True)
+
+    with right:
+        st.markdown('<div class="hud"><div class="hud-title">system telemetry</div>',unsafe_allow_html=True)
+        status="ONLINE" if st.session_state.running else "STANDBY"
+        status_cls="status-online" if st.session_state.running else "status-idle"
+        st.markdown(f'<div class="signal"><span>engine</span><b class="{status_cls}">{status}</b></div>',unsafe_allow_html=True)
+        imp_ph=st.empty(); eng_ph=st.empty(); rate_ph=st.empty(); live_ph=st.empty(); latency_ph=st.empty(); session_ph=st.empty()
+        st.markdown('</div>',unsafe_allow_html=True)
+        st.markdown('<div class="hud" style="margin-top:12px"><div class="hud-title">active tracks</div>',unsafe_allow_html=True)
+        people_ph=st.empty()
+        st.markdown('</div>',unsafe_allow_html=True)
 
     with left:
-        st.markdown("### ◉ Live vision feed")
-        st.caption("MULTI-PERSON TRACKING  •  CONTINUOUS 5-SECOND ATTENTION  •  ONE-TIME ENGAGEMENT")
-        stframe = st.empty()
-        fps_ph = st.empty()
+        st.markdown('<div class="hud"><div class="hud-title">camera / attention field</div>',unsafe_allow_html=True)
+        stframe=st.empty()
+        fps_ph=st.empty()
+        st.markdown('</div>',unsafe_allow_html=True)
 
     if st.session_state.running:
-        detector = EyeDetector()
-        cap = cv2.VideoCapture(0)
-        prev_time = time.time()
-
+        detector=EyeDetector()
+        cap=cv2.VideoCapture(0)
+        prev_time=time.time()
         try:
             while st.session_state.running:
-                ret, frame = cap.read()
+                ret,frame=cap.read()
                 if not ret:
                     st.error("Camera unavailable.")
-                    st.session_state.running = False
+                    st.session_state.running=False
                     break
+                frame=cv2.flip(frame,1)
+                result=detector.process_frame(frame)
+                st.session_state.total_frames+=1
+                st.session_state.last_latency=result.latency_ms
+                now=time.time()
+                fps=1.0/max(now-prev_time,1e-6)
+                prev_time=now
 
-                frame = cv2.flip(frame, 1)
-                result = detector.process_frame(frame)
-                st.session_state.total_frames += 1
-                st.session_state.last_latency = result.latency_ms
-
-                # FPS
-                now = time.time()
-                fps = 1.0 / max(now - prev_time, 1e-6)
-                prev_time = now
-
-                # Count each tracked person once as an impression.
                 for person in result.persons:
                     if person.track_id not in st.session_state.seen_track_ids:
                         st.session_state.seen_track_ids.add(person.track_id)
-                        st.session_state.session_impressions += 1
-
-                    # Engagement is counted only once after continuous 5-second looking.
-                    if (
-                        person.engaged
-                        and person.track_id not in st.session_state.engaged_track_ids
-                    ):
+                        st.session_state.session_impressions+=1
+                    if person.engaged and person.track_id not in st.session_state.engaged_track_ids:
                         st.session_state.engaged_track_ids.add(person.track_id)
-                        st.session_state.session_engagements += 1
-                        logger.log_interaction(
-                            location,
-                            campaign,
-                            person.dwell_time,
-                            True,
-                            False,
-                        )
+                        st.session_state.session_engagements+=1
+                        logger.log_interaction(location,campaign,person.dwell_time,True,False)
 
-                if result.face_count > 0:
-                    st.session_state.last_face_seen = now
+                if result.face_count>0:
+                    st.session_state.last_face_seen=now
 
-                # Render
-                stframe.image(
-                    cv2.cvtColor(result.annotated_frame, cv2.COLOR_BGR2RGB),
-                    use_container_width=True,
-                )
+                stframe.image(cv2.cvtColor(result.annotated_frame,cv2.COLOR_BGR2RGB),use_container_width=True)
 
-                looking_now = sum(1 for p in result.persons if p.looking)
-                engaged_now = sum(1 for p in result.persons if p.engaged)
-                rate = (
-                    st.session_state.session_engagements
-                    / max(st.session_state.session_impressions, 1)
-                    * 100
-                )
-
-                fps_ph.metric("⚡ FPS", f"{fps:.1f}")
-                imp_ph.metric("👥 People", st.session_state.session_impressions)
-                eng_ph.metric("🎯 Engagements", st.session_state.session_engagements)
-                rate_ph.metric("📈 Conversion", f"{rate:.1f}%")
-                live_ph.metric("👁️ Looking now", f"{looking_now} · engaged {engaged_now}")
-                latency_ph.metric("🧠 Vision latency", f"{result.latency_ms:.1f} ms")
+                looking=sum(1 for p in result.persons if p.looking)
+                engaged=sum(1 for p in result.persons if p.engaged)
+                rate=st.session_state.session_engagements/max(st.session_state.session_impressions,1)*100
+                imp_ph.markdown(f'<div class="micro">UNIQUE PEOPLE</div><div class="big-number">{st.session_state.session_impressions:02d}</div>',unsafe_allow_html=True)
+                eng_ph.markdown(f'<div class="micro">ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>',unsafe_allow_html=True)
+                rate_ph.markdown(f'<div class="micro">CONVERSION</div><div class="big-number">{rate:04.1f}%</div>',unsafe_allow_html=True)
+                live_ph.markdown(f'<div class="signal"><span>looking now</span><b>{looking:02d}</b></div><div class="signal"><span>engaged now</span><b>{engaged:02d}</b></div>',unsafe_allow_html=True)
+                latency_ph.metric("LATENCY",f"{result.latency_ms:.1f} ms")
+                fps_ph.metric("FRAME RATE",f"{fps:.1f} FPS")
+                if st.session_state.session_started_at:
+                    elapsed=int(time.time()-st.session_state.session_started_at)
+                    session_ph.metric("SESSION",f"{elapsed//60:02d}:{elapsed%60:02d}")
 
                 if result.persons:
-                    people_lines = ["**LIVE TRACKS**"]
-                    for person in result.persons:
-                        state = "🎯 ENGAGED" if person.engaged else ("👁️ LOOKING" if person.looking else "◌ SEEN")
-                        people_lines.append(f"**Person {person.track_id}** · {state} · {person.dwell_time:.1f}s")
-                    people_ph.markdown("\n\n".join(people_lines))
+                    rows=[]
+                    for p in result.persons:
+                        state="ENGAGED" if p.engaged else ("LOOKING" if p.looking else "SEEN")
+                        cls="track engaged" if p.engaged else "track"
+                        rows.append(f'<div class="{cls}">P{p.track_id} / {state}<span class="time">{p.dwell_time:.1f}s</span></div>')
+                    people_ph.markdown("".join(rows),unsafe_allow_html=True)
                 else:
-                    people_ph.caption("LIVE TRACKS · none detected")
-
-                if st.session_state.session_started_at:
-                    elapsed = int(time.time() - st.session_state.session_started_at)
-                    session_ph.metric("⏱️ Session", f"{elapsed // 60:02d}:{elapsed % 60:02d}")
+                    people_ph.markdown('<div class="micro">NO ACTIVE TRACKS</div>',unsafe_allow_html=True)
         finally:
             cap.release()
-
     else:
-        stframe.info("Sensor is idle. Click **Activate Edge Camera** to begin collecting impressions.")
-        imp_ph.metric("Impressions (session)", st.session_state.session_impressions)
-        eng_ph.metric("Engagements (session)", st.session_state.session_engagements)
+        stframe.markdown('<div class="notice" style="height:430px;display:flex;align-items:center;justify-content:center;text-align:center">SYSTEM STANDBY<br><br>INITIALIZE ENGINE TO OPEN THE ATTENTION FIELD</div>',unsafe_allow_html=True)
+        fps_ph.metric("FRAME RATE","—")
+        imp_ph.markdown(f'<div class="micro">UNIQUE PEOPLE</div><div class="big-number">{st.session_state.session_impressions:02d}</div>',unsafe_allow_html=True)
+        eng_ph.markdown(f'<div class="micro">ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>',unsafe_allow_html=True)
+        rate=st.session_state.session_engagements/max(st.session_state.session_impressions,1)*100
+        rate_ph.markdown(f'<div class="micro">CONVERSION</div><div class="big-number">{rate:04.1f}%</div>',unsafe_allow_html=True)
+        live_ph.markdown('<div class="micro">ENGINE STANDBY</div>',unsafe_allow_html=True)
+        latency_ph.metric("LATENCY","—")
+        session_ph.metric("SESSION","00:00")
+        people_ph.markdown('<div class="micro">NO ACTIVE TRACKS</div>',unsafe_allow_html=True)
 
 # =========================================================
-# CLOUD ANALYTICS TAB
+# INTELLIGENCE LOG
 # =========================================================
 with tab_cloud:
-    st.markdown("### 📈 Analytics command center")
-    st.markdown('<div class="section-hint">Explore campaign performance and manage your locally stored telemetry.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sectionline">telemetry archive / intelligence log</div>',unsafe_allow_html=True)
 
-    # Clear local analytics and current-session counters only after confirmation.
-    with st.expander("🗑️ Data management · clear analytics", expanded=False):
-        st.warning("This permanently deletes all rows from the local analytics database and resets session counters. This cannot be undone.")
-        confirm_clear = st.checkbox("I understand and want to delete all collected analytics", key="confirm_clear")
-        if st.button("🗑️ Clear all data", disabled=not confirm_clear, key="clear_analytics"):
+    with st.expander("⌫  DATA DESTRUCTION / CLEAR LOCAL ARCHIVE"):
+        st.warning("This permanently deletes all locally stored engagement events.")
+        confirm=st.checkbox("CONFIRM PERMANENT DELETION",key="confirm_clear")
+        if st.button("DELETE ALL TELEMETRY",disabled=not confirm):
             if st.session_state.running:
-                st.error("Stop the camera before clearing data.")
+                st.error("Terminate the live engine first.")
             else:
-                with sqlite3.connect(logger.db_path) as clear_conn:
-                    clear_conn.execute("DELETE FROM ad_analytics")
-                st.session_state.session_impressions = 0
-                st.session_state.session_engagements = 0
-                st.session_state.seen_track_ids = set()
-                st.session_state.engaged_track_ids = set()
-                st.session_state.last_face_seen = 0.0
-                st.session_state.session_started_at = None
-                st.session_state.total_frames = 0
-                st.session_state.last_latency = 0.0
-                st.success("All local analytics cleared and session counters reset.")
+                with sqlite3.connect(logger.db_path) as conn:
+                    conn.execute("DELETE FROM ad_analytics")
+                st.session_state.session_impressions=0
+                st.session_state.session_engagements=0
+                st.session_state.seen_track_ids=set()
+                st.session_state.engaged_track_ids=set()
+                st.session_state.session_started_at=None
                 st.rerun()
 
     try:
-        conn = sqlite3.connect(logger.db_path)
-        df = pd.read_sql_query("SELECT * FROM ad_analytics", conn)
-        conn.close()
-
+        with sqlite3.connect(logger.db_path) as conn:
+            df=pd.read_sql_query("SELECT * FROM ad_analytics",conn)
         if df.empty:
-            st.info("No sensor data logged yet. Run the Edge Sensor to collect initial data.")
+            st.markdown('<div class="notice">ARCHIVE EMPTY // INITIALIZE THE LIVE CONTROL ROOM TO GENERATE TELEMETRY</div>',unsafe_allow_html=True)
         else:
-            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s")
+            df["timestamp"]=pd.to_datetime(df["timestamp"],unit="s")
+            total=len(df); engagements=int(df["engaged"].sum()); rate=df["engaged"].mean()*100
+            a,b,c,d=st.columns(4)
+            a.metric("EVENTS",total); b.metric("ENGAGEMENTS",engagements); c.metric("RATE",f"{rate:.1f}%"); d.metric("AVG DWELL",f"{df['dwell_time'].mean():.1f}s")
 
-            # KPI row
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Total Impressions", len(df))
-            c2.metric("Engagements", int(df["engaged"].sum()))
-            c3.metric("Engagement Rate", f"{df['engaged'].mean() * 100:.1f}%")
-            c4.metric(
-                "Avg Dwell (s)",
-                f"{df['dwell_time'].mean():.1f}" if "dwell_time" in df else "—",
-            )
+            st.markdown('<div class="sectionline">performance vectors</div>',unsafe_allow_html=True)
+            loc=df.groupby("location_tag")["engaged"].mean().mul(100).sort_values(ascending=False)
+            camp=df.groupby("campaign")["engaged"].mean().mul(100).sort_values(ascending=False)
+            x,y=st.columns(2)
+            with x:
+                st.caption("LOCATION / ENGAGEMENT %")
+                st.bar_chart(loc)
+            with y:
+                st.caption("CAMPAIGN / ENGAGEMENT %")
+                st.bar_chart(camp)
 
-            st.markdown("### 🧭 Performance snapshot")
-            s1, s2, s3 = st.columns(3)
-            s1.metric("Median dwell", f"{df['dwell_time'].median():.1f}s")
-            s2.metric("Longest attention", f"{df['dwell_time'].max():.1f}s")
-            s3.metric("Tracked zones", int(df["location_tag"].nunique()))
+            st.markdown('<div class="sectionline">attention timeline</div>',unsafe_allow_html=True)
+            timeline=df.set_index("timestamp")["engaged"].resample("1min").agg(["count","sum"])
+            timeline.columns=["events","engagements"]
+            st.area_chart(timeline)
 
-            # Filters
-            st.markdown("### Filters")
-            f1, f2 = st.columns(2)
-            loc_filter = f1.multiselect(
-                "Locations", sorted(df["location_tag"].unique()),
-                default=sorted(df["location_tag"].unique()),
-            )
-            camp_filter = f2.multiselect(
-                "Campaigns", sorted(df["campaign"].unique()),
-                default=sorted(df["campaign"].unique()),
-            )
-            filtered = df[df["location_tag"].isin(loc_filter) & df["campaign"].isin(camp_filter)]
-
-            # Charts
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.subheader("Engagement Rate by Location")
-                loc_stats = filtered.groupby("location_tag")["engaged"].mean() * 100
-                st.bar_chart(loc_stats)
-
-            with col_b:
-                st.subheader("Engagement Rate by Campaign")
-                camp_stats = filtered.groupby("campaign")["engaged"].mean() * 100
-                st.bar_chart(camp_stats)
-
-            st.subheader("Impressions over Time")
-            filtered_time = filtered.set_index("timestamp")
-            st.line_chart(filtered_time["engaged"].resample("1min").count())
-
-            st.subheader("Raw Telemetry Logs")
-            st.dataframe(filtered.tail(50), use_container_width=True)
-
-            # Export
-            st.download_button(
-                "⬇ Download CSV",
-                filtered.reset_index().to_csv(index=False),
-                "ad_analytics.csv",
-                "text/csv",
-            )
-
+            st.markdown('<div class="sectionline">raw event stream</div>',unsafe_allow_html=True)
+            st.dataframe(df.tail(100),use_container_width=True)
+            st.download_button("EXPORT TELEMETRY / CSV",df.to_csv(index=False),"visionguard_telemetry.csv","text/csv")
     except Exception as e:
-        st.warning(f"Database uninitialized or unreadable: {e}")
+        st.error(f"Telemetry archive error: {e}")
+
+st.markdown('<div class="footerline"><span>VISIONGUARD / LOCAL-FIRST COMPUTER VISION</span><span>NO CAMERA FRAMES STORED</span><span>5 SEC ATTENTION PROTOCOL</span></div>',unsafe_allow_html=True)
