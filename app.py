@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 import cv2
 import pandas as pd
 import sqlite3
@@ -426,7 +427,7 @@ with tab_edge:
                 unsafe_allow_html=True,
             )
         else:
-            rtc_configuration = RTCConfiguration({
+            # Refresh only the dashboard telemetry; the WebRTC stream remains active.\n            st_autorefresh(interval=1000, key="adpulse_stats_refresh")\n\n            rtc_configuration = RTCConfiguration({
                 "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
             })
             ctx = webrtc_streamer(
@@ -486,10 +487,10 @@ with tab_edge:
     else:
 
         fps_ph.metric("FRAME RATE","—")
-        imp_ph.markdown(f'<div class="micro">UNIQUE PEOPLE</div><div class="big-number">{st.session_state.session_impressions:02d}</div>',unsafe_allow_html=True)
+        imp_ph.markdown(f'<div class="micro">UNIQUE VIEWERS</div><div class="big-number">{st.session_state.session_impressions:02d}</div>',unsafe_allow_html=True)
         eng_ph.markdown(f'<div class="micro">ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>',unsafe_allow_html=True)
         rate=st.session_state.session_engagements/max(st.session_state.session_impressions,1)*100
-        rate_ph.markdown(f'<div class="micro">CONVERSION</div><div class="big-number">{rate:04.1f}%</div>',unsafe_allow_html=True)
+        rate_ph.markdown(f'<div class="micro">ENGAGEMENT RATE</div><div class="big-number">{rate:04.1f}%</div>',unsafe_allow_html=True)
         live_ph.markdown('<div class="micro">ENGINE STANDBY</div>',unsafe_allow_html=True)
         peak_ph.markdown(f'<div class="signal"><span>peak audience</span><b>{st.session_state.peak_people:02d}</b></div><div class="signal"><span>peak looking</span><b>{st.session_state.peak_looking:02d}</b></div>',unsafe_allow_html=True)
         latency_ph.metric("LATENCY","—")
@@ -500,7 +501,7 @@ with tab_edge:
 # INTELLIGENCE LOG
 # =========================================================
 with tab_cloud:
-    st.markdown('<div class="sectionline">telemetry archive / intelligence log</div>',unsafe_allow_html=True)
+    st.markdown('<div class="sectionline">ad telemetry archive / intelligence log</div>',unsafe_allow_html=True)
 
     # ---------------------------------------------------------
     # PRIVACY / DATA SECURITY CONSOLE
@@ -596,7 +597,7 @@ with tab_cloud:
                 st.caption("LOCATION / ENGAGEMENT %")
                 st.bar_chart(loc,use_container_width=True)
             with y:
-                st.caption("CAMPAIGN / ENGAGEMENT %")
+                st.caption("AD CAMPAIGN / ENGAGEMENT %")
                 st.bar_chart(camp,use_container_width=True)
 
             st.markdown('<div class="sectionline">attention timeline</div>',unsafe_allow_html=True)
