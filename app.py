@@ -499,7 +499,6 @@ with tab_edge:
                     fps_ph_left.metric("FRAME RATE", f'{snapshot["fps"]:.1f} FPS')
 
                     latency_ph.metric("LATENCY", f'{snapshot["latency_ms"]:.1f} ms')
-                    fps_ph.metric("FRAME RATE", f'{snapshot["fps"]:.1f} FPS')
                     rate = st.session_state.session_engagements / max(st.session_state.session_impressions, 1) * 100
                     imp_ph.markdown(f'<div class="micro">UNIQUE VIEWERS</div><div class="big-number">{st.session_state.session_impressions:02d}</div>', unsafe_allow_html=True)
                     eng_ph.markdown(f'<div class="micro">AD ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>', unsafe_allow_html=True)
