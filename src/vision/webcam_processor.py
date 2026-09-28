@@ -12,7 +12,9 @@ from src.vision.detector import EyeDetector
 class AdPulseVideoProcessor(VideoProcessorBase):
     """WebRTC processor: frames are analyzed in memory and never written to disk."""
 
-    def __init__(self, location: str, campaign: str, db_path: str):
+    def __init__(self, event_id: int, event_name: str, location: str, campaign: str, db_path: str):
+        self.event_id = event_id
+        self.event_name = event_name
         self.location = location
         self.campaign = campaign
         self.logger = DetectionLogger(db_path)
@@ -52,6 +54,8 @@ class AdPulseVideoProcessor(VideoProcessorBase):
                     if person.track_id not in self.logged_track_ids:
                         self.logged_track_ids.add(person.track_id)
                         self.logger.log_interaction(
+                            self.event_id,
+                            self.event_name,
                             self.location,
                             self.campaign,
                             person.dwell_time,
