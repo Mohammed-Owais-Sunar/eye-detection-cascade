@@ -8,7 +8,6 @@ class DetectionLogger:
         self._init_db()
         
     def _init_db(self):
-        """Initializes the database schema for ad analytics."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('''CREATE TABLE IF NOT EXISTS ad_analytics (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -16,10 +15,10 @@ class DetectionLogger:
                             location_tag TEXT,
                             campaign TEXT,
                             dwell_time REAL,
-                            engaged BOOLEAN)''')
+                            engaged BOOLEAN,
+                            smiled BOOLEAN)''')
             
-    def log_interaction(self, location, campaign, dwell_time, engaged):
-        """Logs a single impression/engagement event to the database."""
+    def log_interaction(self, location, campaign, dwell_time, engaged, smiled):
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute("INSERT INTO ad_analytics (timestamp, location_tag, campaign, dwell_time, engaged) VALUES (?, ?, ?, ?, ?)",
-                         (time.time(), location, campaign, dwell_time, engaged))
+            conn.execute("INSERT INTO ad_analytics (timestamp, location_tag, campaign, dwell_time, engaged, smiled) VALUES (?, ?, ?, ?, ?, ?)",
+                         (time.time(), location, campaign, dwell_time, engaged, smiled))
