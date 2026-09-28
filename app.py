@@ -430,102 +430,102 @@ with tab_edge:
     with left:
         st.markdown('<div class="hud"><div class="hud-title">camera / attention field</div>',unsafe_allow_html=True)
         stframe=st.empty()
-        fps_ph=st.empty()
-        st.markdown('</div>',unsafe_allow_html=True)
+        fps_ph_left=st.empty()
 
-    if st.session_state.running:
-        # Browser webcam via WebRTC. Frames are processed transiently in memory;
-        # they are never written to disk or added to the telemetry database.
-        consent = st.checkbox(
-            "I CONSENT TO TEMPORARY CAMERA PROCESSING FOR THIS SESSION",
-            key="camera_consent",
-        )
-        if not consent:
-            stframe.markdown(
-                '<div class="notice" style="height:430px;display:flex;align-items:center;justify-content:center;text-align:center">'
-                'CAMERA PAUSED<br><br>GRANT SESSION CONSENT TO START BROWSER CAMERA'
-                '</div>',
-                unsafe_allow_html=True,
+        if st.session_state.running:
+            consent = st.checkbox(
+                "I CONSENT TO TEMPORARY CAMERA PROCESSING FOR THIS SESSION",
+                key="camera_consent",
             )
-        else:
-            # Localhost does not need a public STUN server. In fact, forcing
-            # Google's STUN server locally can make the connection hang on networks
-            # that block or delay STUN traffic. Remote deployments still get STUN.
-            host = str(st.context.headers.get("host", "")).lower()
-            is_local = (
-                host.startswith("localhost")
-                or host.startswith("127.0.0.1")
-                or host.startswith("[::1]")
-            )
-
-            webrtc_kwargs = {
-                "key": "adpulse-camera",
-                "mode": WebRtcMode.SENDRECV,
-                "video_processor_factory": lambda: AdPulseVideoProcessor(
-                    event_id=event_id,
-                    event_name=event_name,
-                    location=location,
-                    campaign=campaign,
-                    db_path=logger.db_path,
-                ),
-                "media_stream_constraints": {"video": True, "audio": False},
-                "async_processing": True,
-            }
-
-            # streamlit-webrtc's basic localhost configuration intentionally
-            # omits rtc_configuration. Remote hosts use STUN and may later add
-            # TURN credentials through Streamlit secrets if required.
-            if not is_local:
-                webrtc_kwargs["rtc_configuration"] = {
-                    "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-                }
-
-            ctx = webrtc_streamer(**webrtc_kwargs)
-
-            if ctx.state.playing:
-                st.markdown(
-                    '<div class="notice">PRIVACY EDGE ACTIVE // VIDEO FRAMES ARE PROCESSED IN MEMORY '
-                    'AND ARE NOT SAVED AS PHOTOS OR VIDEO.</div>',
-                    unsafe_allow_html=True,
-                )
-
-            processor = ctx.video_processor
-            if processor is not None:
-                snapshot = processor.snapshot()
-                st.session_state.session_impressions = snapshot["unique_people"]
-                st.session_state.session_engagements = snapshot["engagements"]
-                st.session_state.peak_people = max(st.session_state.peak_people, snapshot["peak_people"])
-                st.session_state.peak_looking = max(st.session_state.peak_looking, snapshot["peak_looking"])
-                latency_ph.metric("LATENCY", f'{snapshot["latency_ms"]:.1f} ms')
-                fps_ph.metric("FRAME RATE", f'{snapshot["fps"]:.1f} FPS')
-                rate = st.session_state.session_engagements / max(st.session_state.session_impressions, 1) * 100
-                imp_ph.markdown(f'<div class="micro">UNIQUE VIEWERS</div><div class="big-number">{st.session_state.session_impressions:02d}</div>', unsafe_allow_html=True)
-                eng_ph.markdown(f'<div class="micro">AD ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>', unsafe_allow_html=True)
-                rate_ph.markdown(f'<div class="micro">ENGAGEMENT RATE</div><div class="big-number">{rate:04.1f}%</div>', unsafe_allow_html=True)
-                live_ph.markdown(
-                    f'<div class="signal"><span>looking now</span><b>{snapshot["looking_now"]:02d}</b></div>'
-                    f'<div class="signal"><span>engaged now</span><b>{snapshot["engaged_now"]:02d}</b></div>',
-                    unsafe_allow_html=True,
-                )
-                peak_ph.markdown(
-                    f'<div class="signal"><span>peak audience</span><b>{snapshot["peak_people"]:02d}</b></div>'
-                    f'<div class="signal"><span>peak looking</span><b>{snapshot["peak_looking"]:02d}</b></div>',
-                    unsafe_allow_html=True,
-                )
-                if snapshot["tracks_html"]:
-                    people_ph.markdown(snapshot["tracks_html"], unsafe_allow_html=True)
-                else:
-                    people_ph.markdown('<div class="micro">NO ACTIVE TRACKS</div>', unsafe_allow_html=True)
-            else:
+            if not consent:
                 stframe.markdown(
                     '<div class="notice" style="height:430px;display:flex;align-items:center;justify-content:center;text-align:center">'
-                    'BROWSER CAMERA READY<br><br>PRESS START ON THE CAMERA CONTROL'
+                    'CAMERA PAUSED<br><br>GRANT SESSION CONSENT TO START BROWSER CAMERA'
                     '</div>',
                     unsafe_allow_html=True,
                 )
-    else:
+            else:
+                # Render WebRTC INSIDE the left camera panel so the browser
+                # video stays next to deployment and telemetry.
+                host = str(st.context.headers.get("host", "")).lower()
+                is_local = (
+                    host.startswith("localhost")
+                    or host.startswith("127.0.0.1")
+                    or host.startswith("[::1]")
+                )
 
-        fps_ph.metric("FRAME RATE","—")
+                webrtc_kwargs = {
+                    "key": "adpulse-camera",
+                    "mode": WebRtcMode.SENDRECV,
+                    "video_processor_factory": lambda: AdPulseVideoProcessor(
+                        event_id=event_id,
+                        event_name=event_name,
+                        location=location,
+                        campaign=campaign,
+                        db_path=logger.db_path,
+                    ),
+                    "media_stream_constraints": {"video": True, "audio": False},
+                    "async_processing": True,
+                    "video_html_attrs": {
+                        "style": {"width": "100%", "height": "430px", "objectFit": "contain"},
+                        "controls": False,
+                        "autoPlay": True,
+                        "muted": True,
+                    },
+                }
+
+                if not is_local:
+                    webrtc_kwargs["rtc_configuration"] = {
+                        "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+                    }
+
+                ctx = webrtc_streamer(**webrtc_kwargs)
+
+                if ctx.state.playing:
+                    st.markdown(
+                        '<div class="notice">PRIVACY EDGE ACTIVE // VIDEO FRAMES ARE PROCESSED IN MEMORY '
+                        'AND ARE NOT SAVED AS PHOTOS OR VIDEO.</div>',
+                        unsafe_allow_html=True,
+                    )
+
+                processor = ctx.video_processor
+                if processor is not None:
+                    snapshot = processor.snapshot()
+                    st.session_state.session_impressions = snapshot["unique_people"]
+                    st.session_state.session_engagements = snapshot["engagements"]
+                    st.session_state.peak_people = max(st.session_state.peak_people, snapshot["peak_people"])
+                    st.session_state.peak_looking = max(st.session_state.peak_looking, snapshot["peak_looking"])
+
+                    fps_ph_left.metric("FRAME RATE", f'{snapshot["fps"]:.1f} FPS')
+
+                    latency_ph.metric("LATENCY", f'{snapshot["latency_ms"]:.1f} ms')
+                    fps_ph.metric("FRAME RATE", f'{snapshot["fps"]:.1f} FPS')
+                    rate = st.session_state.session_engagements / max(st.session_state.session_impressions, 1) * 100
+                    imp_ph.markdown(f'<div class="micro">UNIQUE VIEWERS</div><div class="big-number">{st.session_state.session_impressions:02d}</div>', unsafe_allow_html=True)
+                    eng_ph.markdown(f'<div class="micro">AD ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>', unsafe_allow_html=True)
+                    rate_ph.markdown(f'<div class="micro">ENGAGEMENT RATE</div><div class="big-number">{rate:04.1f}%</div>', unsafe_allow_html=True)
+                    live_ph.markdown(
+                        f'<div class="signal"><span>looking now</span><b>{snapshot["looking_now"]:02d}</b></div>'
+                        f'<div class="signal"><span>engaged now</span><b>{snapshot["engaged_now"]:02d}</b></div>',
+                        unsafe_allow_html=True,
+                    )
+                    peak_ph.markdown(
+                        f'<div class="signal"><span>peak audience</span><b>{snapshot["peak_people"]:02d}</b></div>'
+                        f'<div class="signal"><span>peak looking</span><b>{snapshot["peak_looking"]:02d}</b></div>',
+                        unsafe_allow_html=True,
+                    )
+                    if snapshot["tracks_html"]:
+                        people_ph.markdown(snapshot["tracks_html"], unsafe_allow_html=True)
+                    else:
+                        people_ph.markdown('<div class="micro">NO ACTIVE TRACKS</div>', unsafe_allow_html=True)
+                else:
+                    fps_ph_left.metric("FRAME RATE", "0.0 FPS")
+        else:
+            fps_ph_left.metric("FRAME RATE","—")
+
+        st.markdown('</div>',unsafe_allow_html=True)
+
+    if not st.session_state.running:
         imp_ph.markdown(f'<div class="micro">UNIQUE VIEWERS</div><div class="big-number">{st.session_state.session_impressions:02d}</div>',unsafe_allow_html=True)
         eng_ph.markdown(f'<div class="micro">ENGAGEMENTS</div><div class="big-number">{st.session_state.session_engagements:02d}</div>',unsafe_allow_html=True)
         rate=st.session_state.session_engagements/max(st.session_state.session_impressions,1)*100
