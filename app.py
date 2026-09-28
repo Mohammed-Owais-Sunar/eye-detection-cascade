@@ -640,11 +640,12 @@ with tab_cloud:
             events.insert(0,"event_id",[f"AP-E{i:03d}" for i in range(1,len(events)+1)])
 
             display_cols=[
-                "event_id","timestamp","location_tag","campaign",
+                "event_id","event_name","timestamp","location_tag","campaign",
                 "dwell_time","engaged","smiled"
             ]
             events=events[display_cols].rename(columns={
-                "event_id":"EVENT",
+                "event_id":"EVENT ID",
+                "event_name":"EVENT",
                 "timestamp":"TIMESTAMP",
                 "location_tag":"LOCATION",
                 "campaign":"CAMPAIGN",
