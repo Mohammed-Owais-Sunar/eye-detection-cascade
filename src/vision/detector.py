@@ -49,6 +49,7 @@ class EyeDetector:
 
         self.next_track_id = 1
         self.tracks: dict[int, dict] = {}
+        self.frame_index = 0
 
     def _new_track(self, center: tuple[int, int], now: float) -> int:
         track_id = self.next_track_id
@@ -59,6 +60,9 @@ class EyeDetector:
             "looking_started": None,
             "dwell_time": 0.0,
             "engaged": False,
+            "eye_count": 0,
+            "looking": False,
+            "eye_boxes": [],
         }
         return track_id
 
@@ -89,6 +93,7 @@ class EyeDetector:
     def process_frame(self, frame: np.ndarray) -> DetectionResult:
         start_time = time.perf_counter()
         now = time.time()
+        self.frame_index += 1
         annotated = frame.copy()
 
         small_frame = cv2.resize(
@@ -110,6 +115,7 @@ class EyeDetector:
         detections = []
         used_tracks: set[int] = set()
         total_eyes = 0
+        run_eye_detection = self.frame_index % self.config.eye_detection_interval == 0
 
         for (fx, fy, fw, fh) in faces:
             orig_fx, orig_fy = int(fx * inv_scale), int(fy * inv_scale)
@@ -122,20 +128,25 @@ class EyeDetector:
             track["center"] = center
             track["last_seen"] = now
 
-            eye_roi_height = int(fh * 0.60)
-            face_roi_gray = gray[fy:fy + eye_roi_height, fx:fx + fw]
-            enhanced_face_roi = self.preprocessor.enhance_contrast(face_roi_gray)
+            if run_eye_detection:
+                eye_roi_height = int(fh * 0.60)
+                face_roi_gray = gray[fy:fy + eye_roi_height, fx:fx + fw]
+                enhanced_face_roi = self.preprocessor.enhance_contrast(face_roi_gray)
 
-            eyes = self.eye_cascade.detectMultiScale(
-                enhanced_face_roi,
-                scaleFactor=self.config.eye_scale_factor,
-                minNeighbors=self.config.eye_min_neighbors,
-                minSize=self.config.eye_min_size,
-            )
+                eyes = self.eye_cascade.detectMultiScale(
+                    enhanced_face_roi,
+                    scaleFactor=self.config.eye_scale_factor,
+                    minNeighbors=self.config.eye_min_neighbors,
+                    minSize=self.config.eye_min_size,
+                )
 
-            eye_count = len(eyes)
+                track["eye_count"] = len(eyes)
+                track["eye_boxes"] = list(eyes)
+
+            eye_count = track["eye_count"]
             total_eyes += eye_count
             looking = eye_count >= self.config.min_eyes_for_engagement
+            track["looking"] = looking
 
             if looking:
                 if track["looking_started"] is None:
@@ -162,7 +173,10 @@ class EyeDetector:
                 self.config.box_thickness,
             )
 
-            for (ex, ey, ew, eh) in eyes:
+            # Reuse the latest eye detections on skipped frames. This avoids
+            # running the expensive eye cascade on every incoming frame while
+            # keeping the visual overlay continuous.
+            for (ex, ey, ew, eh) in track["eye_boxes"]:
                 orig_ex = int((fx + ex) * inv_scale)
                 orig_ey = int((fy + ey) * inv_scale)
                 orig_ew = int(ew * inv_scale)
